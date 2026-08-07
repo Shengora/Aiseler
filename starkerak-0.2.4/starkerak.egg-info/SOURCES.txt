@@ -1,0 +1,8 @@
+README.md
+setup.py
+starkerak.py
+starkerak.egg-info/PKG-INFO
+starkerak.egg-info/SOURCES.txt
+starkerak.egg-info/dependency_links.txt
+starkerak.egg-info/requires.txt
+starkerak.egg-info/top_level.txt
