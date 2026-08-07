@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import { Telegraf, session, Markup } from 'telegraf';
 import db from './db.js';
-import { StarKerakClient } from './starkerak.js';
 
 const app = express();
 const PORT = 3000;
@@ -20,6 +19,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   });
 
   const ADMIN_ID = process.env.ADMIN_ID ? parseInt(process.env.ADMIN_ID) : null;
+  const PAYMENT_ADMIN_ID = process.env.PAYMENT_ADMIN_ID ? parseInt(process.env.PAYMENT_ADMIN_ID) : null;
 
   // Keyboards
   const getMainMenu = () => {
@@ -602,13 +602,29 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
   // Helper to process receipt texts
   async function processReceiptText(text, ctx, sourceName) {
-    // Regex for standard bank/payment bot receipt messages (e.g. Click, Payme SMS style)
-    // Looking for amount (Tushum: / Kirim: / Qabul qilindi:)
-    let amountMatch = text.match(/(?:Tushum|Kirim|Qabul qilindi|Mablag' tushdi|Yangi tolov)[\s:-]*([0-9\s,]+)\s*(?:UZS|so'm)?/i);
+    // Extract configured card number last 4 digits
+    const cardNumber = getSetting('card_number') || '';
+    const last4Match = cardNumber.match(/\d{4}$/);
+    if (last4Match) {
+      const last4 = last4Match[0];
+      // If the incoming message doesn't contain the last 4 digits of the card, ignore it
+      // This prevents processing receipts meant for other cards
+      if (!text.includes(last4)) {
+        return false;
+      }
+    }
+
+    // Regex for standard bank/payment bot receipt messages (e.g. HUMOcardbot, Click, Payme SMS style)
+    // Looking for amount (Tushum: / Kirim: / Qabul qilindi: / Mablag' tushdi / Yangi tolov / ➕)
+    let amountMatch = text.match(/(?:Tushum|Kirim|Qabul qilindi|Mablag' tushdi|Yangi tolov|➕)[\s:-]*([0-9\s,.]+)\s*(?:UZS|so'm)?/i);
     if (!amountMatch) return false;
     
-    const amountStr = amountMatch[1].replace(/\D/g, '');
-    const amount = parseInt(amountStr);
+    let cleanStr = amountMatch[1];
+    if (cleanStr.includes(',')) {
+      cleanStr = cleanStr.split(',')[0]; // Discard decimals (e.g. ,00)
+    }
+    cleanStr = cleanStr.replace(/\D/g, ''); // Remove all dots/spaces to get final number
+    const amount = parseInt(cleanStr);
     
     if (amount > 0) {
       // First check pending payments by exact amount
@@ -658,7 +674,8 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   }
 
   bot.on('business_message', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return;
+    // Only accept business messages from the Main Admin or the Payment Admin
+    if (ctx.from.id !== ADMIN_ID && ctx.from.id !== PAYMENT_ADMIN_ID) return;
     
     // Check if the business message is from the connected admin account
     const message = ctx.businessMessage;
@@ -907,20 +924,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   // Enable graceful stop
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
-  
-  if (process.env.STARKERAK_API_KEY) {
-    const starKerakClient = new StarKerakClient(
-      process.env.STARKERAK_API_KEY, 
-      bot, 
-      getSetting, 
-      addBalance, 
-      addTransaction, 
-      getUser
-    );
-    starKerakClient.connect();
-  } else {
-    console.warn('[AI Studio] STARKERAK_API_KEY is not set. WebSocket will not start.');
-  }
   
   bot.launch().catch(err => console.error('Failed to launch bot:', err));
   console.log('Telegram bot is running.');
