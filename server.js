@@ -6,6 +6,14 @@ import { processReceiptText } from './paymentProcessor.js';
 import { initiateUserbotLogin, handleUserbotAuthInputs } from './userbotAuth.js';
 import { startUserbot, isUserbotRunning } from './userbot.js';
 
+// Global exception handlers to prevent the process from crashing
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL: Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 const app = express();
 const PORT = 3000;
 const HOST = '0.0.0.0';
