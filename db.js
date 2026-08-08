@@ -7,7 +7,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = path.join(__dirname, 'bot.db');
-const db = new Database(dbPath);
+let db;
+
+try {
+  db = new Database(dbPath);
+} catch (error) {
+  console.error("CRITICAL ERROR: Failed to initialize better-sqlite3 database.");
+  console.error(error);
+  process.exit(1); // Exit explicitly so it doesn't just hang or crash mysteriously
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
