@@ -643,17 +643,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
   // processReceiptText is now imported from paymentProcessor.js
 
-  bot.on('business_message', async (ctx) => {
-    // Only accept business messages from the Main Admin or the Payment Admin
-    if (ctx.from.id !== ADMIN_ID && ctx.from.id !== PAYMENT_ADMIN_ID) return;
-    
-    // Check if the business message is from the connected admin account
-    const message = ctx.businessMessage;
-    if (!message || !message.text) return;
-    
-    await processReceiptText(message.text, ctx, "Business", bot);
-  });
-
   // Admin Commands & States
   bot.action('admin_products', (ctx) => {
     ctx.answerCbQuery();

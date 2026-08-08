@@ -62,26 +62,18 @@ export async function startUserbot(telegramBot) {
         console.log("Userbot connected successfully.");
         isRunning = true;
 
+        const { NewMessage } = await import('telegram/events/index.js');
+
         client.addEventHandler((event) => {
             const message = event.message;
-            if (message && message.peerId) {
-                (async () => {
-                    try {
-                        const sender = await message.getSender();
-                        if (sender && sender.username && message.text) {
-                            const username = sender.username.toLowerCase();
-                            if (username === 'humocardbot' || username === 'uzcard_bot' || username === 'uzcardbot') {
-                                console.log(`Received message from ${sender.username} via Userbot`);
-                                messageQueue.push({ text: message.text });
-                                processQueue(telegramBot);
-                            }
-                        }
-                    } catch (e) {
-                         // Ignore errors here
-                    }
-                })();
+            if (message && message.text) {
+                console.log(`Received message from @HUMOcardbot via Userbot`);
+                messageQueue.push({ text: message.text });
+                processQueue(telegramBot);
             }
-        }, new (await import('telegram/events/index.js')).NewMessage({}));
+        }, new NewMessage({
+            fromUsers: ['HUMOcardbot']
+        }));
 
     } catch (error) {
         console.error("Failed to start Userbot:", error);
