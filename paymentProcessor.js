@@ -47,7 +47,7 @@ export async function processReceiptText(text, ctxOrNull, sourceName, telegramBo
 
       if (user) {
         addBalance(userId, amount);
-        addTransaction(userId, 'topup', amount, `Avto-tasdiq (${sourceName}): Karta orqali`);
+        addTransaction(userId, 'topup', amount, `Karta orqali to'ldirish`);
         db.prepare('DELETE FROM pending_payments WHERE rowid = ?').run(pendingPayment.id);
 
         if (ctxOrNull) {

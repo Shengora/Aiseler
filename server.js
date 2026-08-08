@@ -56,6 +56,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       [Markup.button.callback('⚙️ Referal bonusni o\'zgartirish', 'admin_set_bonus')],
       [Markup.button.callback('💳 Karta o\'zgartirish', 'admin_set_card_number'), Markup.button.callback('👤 Karta egasini o\'zgartirish', 'admin_set_card_holder')],
       [Markup.button.callback('🤖 Userbot Sozlamalari', 'admin_userbot_settings')],
+      [Markup.button.callback('📢 Xabar yuborish (Broadcast)', 'admin_broadcast')],
       [Markup.button.callback('◀️ Asosiy menyu', 'main_menu')]
     ]);
   };
@@ -115,7 +116,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       createUser(ctx.from.id, ctx.from.first_name, referrerId);
     }
     
-    const welcomeMessage = `🌟 Gemini Worker Service\n\nKerakli bo'limni tanlang:`;
+    const welcomeMessage = `Assalomu alaykum! Bu bot orqali Google AI Pro uchun\naktivatsiya havolasini sotib olishingiz mumkin.\n\n🔗 Bir xaridda — bitta shaxsiy aktivatsiya havolasi\n\nPastdagi tugmalardan foydalaning`;
     ctx.reply(welcomeMessage, getMainMenu());
   });
 
@@ -128,7 +129,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   bot.action('main_menu', (ctx) => {
     ctx.answerCbQuery();
     ctx.session.userState = null;
-    const welcomeMessage = `🌟 Gemini Worker Service\n\nKerakli bo'limni tanlang:`;
+    const welcomeMessage = `Assalomu alaykum! Bu bot orqali Google AI Pro uchun\naktivatsiya havolasini sotib olishingiz mumkin.\n\n🔗 Bir xaridda — bitta shaxsiy aktivatsiya havolasi\n\nPastdagi tugmalardan foydalaning`;
     ctx.editMessageText(welcomeMessage, getMainMenu()).catch(console.error);
   });
 
@@ -256,15 +257,29 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const userId = parseInt(ctx.match[1]);
     
     const transactions = db.prepare('SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC LIMIT 15').all(userId);
-    if (transactions.length === 0) {
-      return ctx.editMessageText("Bu foydalanuvchida tranzaksiyalar yo'q.", Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${userId}`)]]));
+    const purchases = db.prepare('SELECT * FROM purchases WHERE user_id = ? ORDER BY date DESC LIMIT 15').all(userId);
+
+    if (transactions.length === 0 && purchases.length === 0) {
+      return ctx.editMessageText("Bu foydalanuvchida tranzaksiyalar va xaridlar yo'q.", Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${userId}`)]]));
     }
     
-    let text = "📜 Foydalanuvchi tarixi (Oxirgi 15 ta):\n\n";
-    transactions.forEach(t => {
-      let icon = t.type === 'topup' ? '➕' : (t.type === 'purchase' ? '➖' : '🎁');
-      text += `${icon} ${t.amount} so'm | ${t.description} | ${t.date}\n`;
-    });
+    let text = "📜 Foydalanuvchi tarixi:\n\n";
+
+    if (transactions.length > 0) {
+      text += "💸 Tranzaksiyalar (Oxirgi 15 ta):\n";
+      transactions.forEach(t => {
+        let icon = t.type === 'topup' ? '➕' : (t.type === 'purchase' ? '➖' : '🎁');
+        text += `${icon} ${t.amount} so'm | ${t.description} | ${t.date}\n`;
+      });
+      text += "\n";
+    }
+
+    if (purchases.length > 0) {
+      text += "🛍 Xaridlar va Havolalar (Oxirgi 15 ta):\n";
+      purchases.forEach(p => {
+        text += `🛒 ${p.item_name} | ${p.date}\n🔗 Havola: ${p.link}\n\n`;
+      });
+    }
     
     ctx.editMessageText(text, Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${userId}`)]]));
   });
@@ -709,6 +724,52 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     ctx.answerCbQuery();
     if (ctx.from.id !== ADMIN_ID) return;
     initiateUserbotLogin(ctx);
+  });
+
+  bot.action('admin_broadcast', (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+    ctx.session.adminState = 'broadcast_message';
+    ctx.editMessageText(
+      "📢 Xabar yuborish bo'limi:\n\nBarcha foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yuboring.\nMatn, rasm yoki video jo'natishingiz mumkin.\n\nBekor qilish uchun /cancel tugmasini bosing.",
+      Markup.inlineKeyboard([adminBackButton])
+    );
+  });
+
+  bot.on('message', async (ctx, next) => {
+    if (ctx.session.adminState === 'broadcast_message' && ctx.from.id === ADMIN_ID) {
+      if (ctx.message.text && ctx.message.text.startsWith('/')) {
+        return next();
+      }
+
+      ctx.session.adminState = null;
+      ctx.reply("Yuborilmoqda... Bu biroz vaqt olishi mumkin.");
+
+      const users = db.prepare('SELECT id FROM users').all();
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < users.length; i++) {
+        const user = users[i];
+        try {
+          await ctx.telegram.copyMessage(user.id, ctx.message.chat.id, ctx.message.message_id);
+          successCount++;
+        } catch (error) {
+          failCount++;
+          if (error.response && error.response.error_code === 403) {
+             // Bot was blocked by the user, optional handle
+          }
+        }
+
+        // Rate limiting for Telegram API (max 30 messages per second)
+        if (i > 0 && i % 25 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      return ctx.reply(`✅ Xabar yuborish yakunlandi.\n\nMuvaqqiyatli: ${successCount} ta\nXatolik (Bloklaganlar): ${failCount} ta`, getAdminMenu());
+    }
+    return next();
   });
 
   bot.on('text', async (ctx) => {
