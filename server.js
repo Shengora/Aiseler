@@ -121,6 +121,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
   bot.command('cancel', (ctx) => {
     ctx.session.userState = null;
+    ctx.session.adminState = null;
     ctx.reply('Bekor qilindi. Asosiy menyu:', getMainMenu());
   });
 
@@ -787,30 +788,39 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         ctx.session.adminState = 'add_product_price';
         ctx.reply("Endi tovar narxini kiriting (faqat raqam):");
       } else if (state === 'add_product_price') {
-        const val = parseInt(ctx.message.text);
+        const val = parseInt(ctx.message.text.replace(/\D/g, ''));
         if (isNaN(val)) return ctx.reply('Faqat raqam kiriting.');
-        const p = ctx.session.newProduct;
-        db.prepare('INSERT INTO products (name, description, price) VALUES (?, ?, ?)').run(p.name, p.description, val);
-        ctx.session.adminState = null;
-        ctx.session.newProduct = null;
-        ctx.reply('✅ Yangi tovar muvaffaqiyatli qo\'shildi!', getAdminMenu());
+        const p = ctx.session.newProduct || {};
+        if (!p.name || !p.description) {
+            ctx.session.adminState = null;
+            return ctx.reply('Xatolik: Tovar nomi yoki ma\'lumoti topilmadi. Iltimos qaytadan urinib ko\'ring.', getAdminMenu());
+        }
+        try {
+            db.prepare('INSERT INTO products (name, description, price) VALUES (?, ?, ?)').run(p.name, p.description, val);
+            ctx.session.adminState = null;
+            ctx.session.newProduct = null;
+            return ctx.reply('✅ Yangi tovar muvaffaqiyatli qo\'shildi!', getAdminMenu());
+        } catch (e) {
+            console.error(e);
+            ctx.reply('Xatolik yuz berdi: ' + e.message);
+        }
       } else if (state === 'edit_prod_name') {
         db.prepare('UPDATE products SET name = ? WHERE id = ?').run(ctx.message.text, ctx.session.pendingProductId);
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
-        ctx.reply('✅ Tovar nomi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        return ctx.reply('✅ Tovar nomi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'edit_prod_desc') {
         db.prepare('UPDATE products SET description = ? WHERE id = ?').run(ctx.message.text, ctx.session.pendingProductId);
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
-        ctx.reply('✅ Tovar ma\'lumoti muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        return ctx.reply('✅ Tovar ma\'lumoti muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'edit_prod_price') {
         const val = parseInt(ctx.message.text);
         if (isNaN(val)) return ctx.reply('Faqat raqam kiriting.');
         db.prepare('UPDATE products SET price = ? WHERE id = ?').run(val, ctx.session.pendingProductId);
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
-        ctx.reply('✅ Tovar narxi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        return ctx.reply('✅ Tovar narxi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'add_key_text') {
         const lines = ctx.message.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length === 0) return ctx.reply("Kamida 1 ta kalit yozing.");
@@ -827,15 +837,15 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         if (isNaN(val)) return ctx.reply('Faqat raqam kiriting.');
         setSetting('referral_bonus', val.toString());
         ctx.session.adminState = null;
-        ctx.reply('✅ Bonus muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        return ctx.reply('✅ Bonus muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'set_card_number') {
         setSetting('card_number', ctx.message.text);
         ctx.session.adminState = null;
-        ctx.reply('✅ Karta raqami muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        return ctx.reply('✅ Karta raqami muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'set_card_holder') {
         setSetting('card_holder', ctx.message.text);
         ctx.session.adminState = null;
-        ctx.reply('✅ Karta egasi ism-familiyasi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        return ctx.reply('✅ Karta egasi ism-familiyasi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'manage_user_id') {
         const userId = parseInt(ctx.message.text);
         if (isNaN(userId)) return ctx.reply('Faqat raqam (User ID) kiriting.');
