@@ -14,18 +14,24 @@ async function processQueue(telegramBot) {
     if (isProcessingQueue) return;
     isProcessingQueue = true;
 
-    while (messageQueue.length > 0) {
-        const message = messageQueue.shift();
-        try {
-            await processReceiptText(message.text, null, "Userbot", telegramBot);
-        } catch (error) {
-            console.error("Error processing userbot message:", error);
+    try {
+        while (messageQueue.length > 0) {
+            const message = messageQueue.shift();
+            try {
+                await processReceiptText(message.text, null, "Userbot", telegramBot);
+            } catch (error) {
+                console.error("Error processing userbot message in queue:", error);
+            }
+            // Ensure sequential processing with a delay between each message
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
-        // Small delay to prevent spamming if many messages arrive at once
-        await new Promise(resolve => setTimeout(resolve, 500));
+    } finally {
+        isProcessingQueue = false;
+        // In case a message was pushed exactly as we exited the loop
+        if (messageQueue.length > 0) {
+            processQueue(telegramBot);
+        }
     }
-
-    isProcessingQueue = false;
 }
 
 export async function startUserbot(telegramBot) {
@@ -39,9 +45,9 @@ export async function startUserbot(telegramBot) {
         return;
     }
 
-    const sessionStr = db.prepare('SELECT value FROM settings WHERE key = ?').get('userbot_session')?.value;
+    const sessionStr = db.prepare('SELECT value FROM settings WHERE key = ?').get('userbot_session')?.value || process.env.USERBOT_SESSION;
     if (!sessionStr) {
-        console.log("No Userbot session found in database.");
+        console.log("No Userbot session found in database or .env.");
         return;
     }
 
@@ -62,10 +68,13 @@ export async function startUserbot(telegramBot) {
                 (async () => {
                     try {
                         const sender = await message.getSender();
-                        if (sender && sender.username === 'HUMOcardbot' && message.text) {
-                            console.log("Received message from HUMOcardbot via Userbot");
-                            messageQueue.push({ text: message.text });
-                            processQueue(telegramBot);
+                        if (sender && sender.username && message.text) {
+                            const username = sender.username.toLowerCase();
+                            if (username === 'humocardbot' || username === 'uzcard_bot' || username === 'uzcardbot') {
+                                console.log(`Received message from ${sender.username} via Userbot`);
+                                messageQueue.push({ text: message.text });
+                                processQueue(telegramBot);
+                            }
                         }
                     } catch (e) {
                          // Ignore errors here
