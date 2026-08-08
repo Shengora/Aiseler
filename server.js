@@ -2,9 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import { Telegraf, session, Markup } from 'telegraf';
 import db from './db.js';
-import { processReceiptText } from './paymentProcessor.js';
-import { initiateUserbotLogin, handleUserbotAuthInputs } from './userbotAuth.js';
-import { startUserbot, isUserbotRunning } from './userbot.js';
+import { processReceiptText, getUser, addBalance, addTransaction, getSetting, setSetting } from './paymentProcessor.js';
+import { startUserbot } from './userbot.js';
 
 const app = express();
 const PORT = 3000;
@@ -55,16 +54,12 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       [Markup.button.callback('🔑 Kalit (Havola) qo\'shish', 'admin_add_key')],
       [Markup.button.callback('⚙️ Referal bonusni o\'zgartirish', 'admin_set_bonus')],
       [Markup.button.callback('💳 Karta o\'zgartirish', 'admin_set_card_number'), Markup.button.callback('👤 Karta egasini o\'zgartirish', 'admin_set_card_holder')],
-      [Markup.button.callback('🤖 Userbot Sozlamalari', 'admin_userbot_settings')],
+      [Markup.button.callback('🤖 Userbot Sessiyasini o\'rnatish', 'admin_set_userbot')],
       [Markup.button.callback('◀️ Asosiy menyu', 'main_menu')]
     ]);
   };
 
   // Helper functions
-  const getSetting = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value;
-  const setSetting = (key, value) => db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
-  
-  const getUser = (id) => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   
   // Middleware to check blocked status
   bot.use(async (ctx, next) => {
@@ -81,12 +76,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   });
   const createUser = (id, firstName, referrerId = null) => {
     db.prepare('INSERT INTO users (id, first_name, referrer_id) VALUES (?, ?, ?)').run(id, firstName, referrerId);
-  };
-  const addBalance = (id, amount) => {
-    db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, id);
-  };
-  const addTransaction = (userId, type, amount, description) => {
-    db.prepare('INSERT INTO transactions (user_id, type, amount, description) VALUES (?, ?, ?, ?)').run(userId, type, amount, description);
   };
 
   // Commands
@@ -121,7 +110,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
   bot.command('cancel', (ctx) => {
     ctx.session.userState = null;
-    ctx.session.adminState = null;
     ctx.reply('Bekor qilindi. Asosiy menyu:', getMainMenu());
   });
 
@@ -471,7 +459,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     ]));
   });
 
-  bot.action(/^buy_(\d+)$/, async (ctx) => {
+  bot.action(/^buy_(\d+)$/, (ctx) => {
     const productId = parseInt(ctx.match[1]);
     const user = getUser(ctx.from.id);
     
@@ -507,19 +495,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
         return keyRow;
       })();
-
-      // Log purchase to channel if configured
-      const purchaseChannelId = process.env.PURCHASE_CHANNEL_ID;
-      if (purchaseChannelId) {
-          try {
-              await ctx.telegram.sendMessage(
-                  purchaseChannelId,
-                  `✅ Yangi xarid!\n\n🆔 Foydalanuvchi ID: ${ctx.from.id}\n👤 Ism: ${ctx.from.first_name}\n🛍 Mahsulot: ${product.name}\n💰 Narx: ${product.price} so'm\n📅 Vaqt: ${new Date().toLocaleString()}`
-              );
-          } catch (e) {
-              console.error("Could not send purchase log to channel", e);
-          }
-      }
 
       // Referral bonus
       if (user.referrer_id) {
@@ -618,7 +593,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     }
   });
 
-  // processReceiptText is now imported from paymentProcessor.js
 
   bot.on('business_message', async (ctx) => {
     // Only accept business messages from the Main Admin or the Payment Admin
@@ -628,7 +602,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const message = ctx.businessMessage;
     if (!message || !message.text) return;
     
-    await processReceiptText(message.text, ctx, "Business", bot);
+    await processReceiptText(message.text, ctx, "Business");
   });
 
   // Admin Commands & States
@@ -691,24 +665,12 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     ctx.editMessageText(`Joriy karta egasi: ${getSetting('card_holder') || 'O\'rnatilmagan'}\nYangi karta egasi ism-familiyasi kiriting:`, Markup.inlineKeyboard([adminBackButton]));
   });
 
-    bot.action('admin_userbot_settings', (ctx) => {
+  bot.action('admin_set_userbot', (ctx) => {
     ctx.answerCbQuery();
     if (ctx.from.id !== ADMIN_ID) return;
-    ctx.session.adminState = null;
-
-    const status = isUserbotRunning() ? '🟢 Ishlayapti' : '🔴 To\'xtatilgan';
-    const text = `🤖 Userbot Sozlamalari\n\nHolat: ${status}\n\nQuyidagi tugma orqali hisobni ulashingiz mumkin.`;
-
-    ctx.editMessageText(text, Markup.inlineKeyboard([
-      [Markup.button.callback('🔗 Hisob ulash', 'admin_userbot_connect')],
-      adminBackButton
-    ]));
-  });
-
-  bot.action('admin_userbot_connect', (ctx) => {
-    ctx.answerCbQuery();
-    if (ctx.from.id !== ADMIN_ID) return;
-    initiateUserbotLogin(ctx);
+    ctx.session.adminState = 'set_userbot_session';
+    const currentSession = getSetting('userbot_session') ? 'O\'rnatilgan' : 'O\'rnatilmagan';
+    ctx.editMessageText(`Joriy Userbot Sessiyasi: ${currentSession}\n\nTerminal orqali "node userbotAuth.js" deb yozib, olingan sessiya kodini shu yerga yuboring (Agar xato bo'lsa .env dagi USERBOT_SESSION ishlatiladi):`, Markup.inlineKeyboard([adminBackButton]));
   });
 
   bot.on('text', async (ctx) => {
@@ -776,9 +738,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     }
 
     if (ctx.from.id === ADMIN_ID && state) {
-      if (state.startsWith('userbot_auth_')) {
-          return await handleUserbotAuthInputs(ctx, state, bot);
-      }
       if (state === 'add_product_name') {
         ctx.session.newProduct = { name: ctx.message.text };
         ctx.session.adminState = 'add_product_desc';
@@ -788,39 +747,30 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         ctx.session.adminState = 'add_product_price';
         ctx.reply("Endi tovar narxini kiriting (faqat raqam):");
       } else if (state === 'add_product_price') {
-        const val = parseInt(ctx.message.text.replace(/\D/g, ''));
+        const val = parseInt(ctx.message.text);
         if (isNaN(val)) return ctx.reply('Faqat raqam kiriting.');
-        const p = ctx.session.newProduct || {};
-        if (!p.name || !p.description) {
-            ctx.session.adminState = null;
-            return ctx.reply('Xatolik: Tovar nomi yoki ma\'lumoti topilmadi. Iltimos qaytadan urinib ko\'ring.', getAdminMenu());
-        }
-        try {
-            db.prepare('INSERT INTO products (name, description, price) VALUES (?, ?, ?)').run(p.name, p.description, val);
-            ctx.session.adminState = null;
-            ctx.session.newProduct = null;
-            return ctx.reply('✅ Yangi tovar muvaffaqiyatli qo\'shildi!', getAdminMenu());
-        } catch (e) {
-            console.error(e);
-            ctx.reply('Xatolik yuz berdi: ' + e.message);
-        }
+        const p = ctx.session.newProduct;
+        db.prepare('INSERT INTO products (name, description, price) VALUES (?, ?, ?)').run(p.name, p.description, val);
+        ctx.session.adminState = null;
+        ctx.session.newProduct = null;
+        ctx.reply('✅ Yangi tovar muvaffaqiyatli qo\'shildi!', getAdminMenu());
       } else if (state === 'edit_prod_name') {
         db.prepare('UPDATE products SET name = ? WHERE id = ?').run(ctx.message.text, ctx.session.pendingProductId);
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
-        return ctx.reply('✅ Tovar nomi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        ctx.reply('✅ Tovar nomi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'edit_prod_desc') {
         db.prepare('UPDATE products SET description = ? WHERE id = ?').run(ctx.message.text, ctx.session.pendingProductId);
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
-        return ctx.reply('✅ Tovar ma\'lumoti muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        ctx.reply('✅ Tovar ma\'lumoti muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'edit_prod_price') {
         const val = parseInt(ctx.message.text);
         if (isNaN(val)) return ctx.reply('Faqat raqam kiriting.');
         db.prepare('UPDATE products SET price = ? WHERE id = ?').run(val, ctx.session.pendingProductId);
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
-        return ctx.reply('✅ Tovar narxi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        ctx.reply('✅ Tovar narxi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'add_key_text') {
         const lines = ctx.message.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length === 0) return ctx.reply("Kamida 1 ta kalit yozing.");
@@ -837,15 +787,19 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         if (isNaN(val)) return ctx.reply('Faqat raqam kiriting.');
         setSetting('referral_bonus', val.toString());
         ctx.session.adminState = null;
-        return ctx.reply('✅ Bonus muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        ctx.reply('✅ Bonus muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'set_card_number') {
         setSetting('card_number', ctx.message.text);
         ctx.session.adminState = null;
-        return ctx.reply('✅ Karta raqami muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        ctx.reply('✅ Karta raqami muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'set_card_holder') {
         setSetting('card_holder', ctx.message.text);
         ctx.session.adminState = null;
-        return ctx.reply('✅ Karta egasi ism-familiyasi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+        ctx.reply('✅ Karta egasi ism-familiyasi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+      } else if (state === 'set_userbot_session') {
+        setSetting('userbot_session', ctx.message.text);
+        ctx.session.adminState = null;
+        ctx.reply('✅ Userbot sessiyasi muvaffaqiyatli saqlandi! Botni qayta ishga tushiring.', getAdminMenu());
       } else if (state === 'manage_user_id') {
         const userId = parseInt(ctx.message.text);
         if (isNaN(userId)) return ctx.reply('Faqat raqam (User ID) kiriting.');
@@ -890,7 +844,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       if (ctx.message.text !== '⬅️ Asosiy menyu' && !ctx.message.text.startsWith('/')) {
         let isReceipt = false;
         if (ctx.from.id === ADMIN_ID) {
-          isReceipt = await processReceiptText(ctx.message.text, ctx, "Bot (Qo'lda jo'natilgan)", bot);
+          isReceipt = await processReceiptText(ctx.message.text, ctx, "Bot (Qo'lda jo'natilgan)");
         }
         
         if (!isReceipt) {
@@ -906,9 +860,9 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   
   bot.launch().catch(err => console.error('Failed to launch bot:', err));
   console.log('Telegram bot is running.');
-  setTimeout(() => {
-    startUserbot(bot).catch(console.error);
-  }, 2000);
+
+  // Start Userbot integration
+  startUserbot(bot).catch(err => console.error('Failed to start userbot:', err));
 } else {
   console.warn('[AI Studio] TELEGRAM_BOT_TOKEN is not set. Bot will not start.');
 }
