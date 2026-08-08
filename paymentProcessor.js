@@ -29,10 +29,12 @@ export async function processReceiptText(text, ctxOrNull, sourceName, telegramBo
   let amountMatch = cleanText.match(/(?:Tushum|Kirim|Qabul qilindi|Mablag' tushdi|Yangi tolov|➕)[\s:-]*([0-9\s,.]+)\s*(?:UZS|so'm)?/i);
   if (!amountMatch) return false;
 
-  let cleanStr = amountMatch[1];
-  if (cleanStr.includes(',')) {
-    cleanStr = cleanStr.split(',')[0];
-  }
+  let cleanStr = amountMatch[1].trim();
+
+  // Remove .00 or ,00 tiyin part if it exists at the end
+  cleanStr = cleanStr.replace(/[,.]00$/, '');
+
+  // Remove all non-digit characters
   cleanStr = cleanStr.replace(/\D/g, '');
   const amount = parseInt(cleanStr);
 
@@ -63,32 +65,6 @@ export async function processReceiptText(text, ctxOrNull, sourceName, telegramBo
           console.error("Could not send auto-approve message", e);
         }
         return true;
-      }
-    } else {
-      const userIdMatch = cleanText.match(/ID[\s:-]*(\d+)/i) || cleanText.match(/(?:Izoh|Comment)[\s:-]*(\d+)/i);
-      if (userIdMatch) {
-        const userId = parseInt(userIdMatch[1]);
-        const user = getUser(userId);
-
-        if (user) {
-          addBalance(userId, amount);
-          addTransaction(userId, 'topup', amount, `Avto-tasdiq (${sourceName}): Karta orqali (Izohdan)`);
-          if (ctxOrNull) {
-            ctxOrNull.reply(`✅ To'lov tasdiqlandi (Izohdan):\nID: ${userId}\nFoydalanuvchi: ${user.first_name}\nSumma: ${amount} so'm qo'shildi.`).catch(console.error);
-          }
-          try {
-            if (telegramBot) {
-                await telegramBot.telegram.sendMessage(userId, `✅ To'lov tasdiqlandi! Balansingizga ${amount} so'm qo'shildi.`);
-                const adminIdStr = process.env.ADMIN_ID;
-                if (adminIdStr) {
-                    await telegramBot.telegram.sendMessage(parseInt(adminIdStr), `✅ Yangi balans to'ldirish (Izohdan):\nID: ${userId}\nSumma: ${amount} so'm`);
-                }
-            }
-          } catch (e) {
-            console.error("Could not send auto-approve message", e);
-          }
-          return true;
-        }
       }
     }
   }

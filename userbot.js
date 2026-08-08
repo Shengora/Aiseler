@@ -39,9 +39,9 @@ export async function startUserbot(telegramBot) {
         return;
     }
 
-    const sessionStr = db.prepare('SELECT value FROM settings WHERE key = ?').get('userbot_session')?.value;
+    const sessionStr = db.prepare('SELECT value FROM settings WHERE key = ?').get('userbot_session')?.value || process.env.USERBOT_SESSION;
     if (!sessionStr) {
-        console.log("No Userbot session found in database.");
+        console.log("No Userbot session found in database or .env.");
         return;
     }
 
@@ -62,10 +62,13 @@ export async function startUserbot(telegramBot) {
                 (async () => {
                     try {
                         const sender = await message.getSender();
-                        if (sender && sender.username === 'HUMOcardbot' && message.text) {
-                            console.log("Received message from HUMOcardbot via Userbot");
-                            messageQueue.push({ text: message.text });
-                            processQueue(telegramBot);
+                        if (sender && sender.username && message.text) {
+                            const username = sender.username.toLowerCase();
+                            if (username === 'humocardbot' || username === 'uzcard_bot' || username === 'uzcardbot') {
+                                console.log(`Received message from ${sender.username} via Userbot`);
+                                messageQueue.push({ text: message.text });
+                                processQueue(telegramBot);
+                            }
                         }
                     } catch (e) {
                          // Ignore errors here
