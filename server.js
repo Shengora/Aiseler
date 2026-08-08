@@ -777,7 +777,8 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
     if (ctx.from.id === ADMIN_ID && state) {
       if (state.startsWith('userbot_auth_')) {
-          return await handleUserbotAuthInputs(ctx, state, bot);
+          handleUserbotAuthInputs(ctx, state, bot).catch(console.error);
+          return;
       }
       if (state === 'add_product_name') {
         ctx.session.newProduct = { name: ctx.message.text };

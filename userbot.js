@@ -14,18 +14,24 @@ async function processQueue(telegramBot) {
     if (isProcessingQueue) return;
     isProcessingQueue = true;
 
-    while (messageQueue.length > 0) {
-        const message = messageQueue.shift();
-        try {
-            await processReceiptText(message.text, null, "Userbot", telegramBot);
-        } catch (error) {
-            console.error("Error processing userbot message:", error);
+    try {
+        while (messageQueue.length > 0) {
+            const message = messageQueue.shift();
+            try {
+                await processReceiptText(message.text, null, "Userbot", telegramBot);
+            } catch (error) {
+                console.error("Error processing userbot message in queue:", error);
+            }
+            // Ensure sequential processing with a delay between each message
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
-        // Small delay to prevent spamming if many messages arrive at once
-        await new Promise(resolve => setTimeout(resolve, 500));
+    } finally {
+        isProcessingQueue = false;
+        // In case a message was pushed exactly as we exited the loop
+        if (messageQueue.length > 0) {
+            processQueue(telegramBot);
+        }
     }
-
-    isProcessingQueue = false;
 }
 
 export async function startUserbot(telegramBot) {
