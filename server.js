@@ -56,6 +56,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       [Markup.button.callback('⚙️ Referal bonusni o\'zgartirish', 'admin_set_bonus')],
       [Markup.button.callback('💳 Karta o\'zgartirish', 'admin_set_card_number'), Markup.button.callback('👤 Karta egasini o\'zgartirish', 'admin_set_card_holder')],
       [Markup.button.callback('🤖 Userbot Sozlamalari', 'admin_userbot_settings')],
+      [Markup.button.callback('📢 Xabar yuborish (Broadcast)', 'admin_broadcast')],
       [Markup.button.callback('◀️ Asosiy menyu', 'main_menu')]
     ]);
   };
@@ -709,6 +710,52 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     ctx.answerCbQuery();
     if (ctx.from.id !== ADMIN_ID) return;
     initiateUserbotLogin(ctx);
+  });
+
+  bot.action('admin_broadcast', (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+    ctx.session.adminState = 'broadcast_message';
+    ctx.editMessageText(
+      "📢 Xabar yuborish bo'limi:\n\nBarcha foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yuboring.\nMatn, rasm yoki video jo'natishingiz mumkin.\n\nBekor qilish uchun /cancel tugmasini bosing.",
+      Markup.inlineKeyboard([adminBackButton])
+    );
+  });
+
+  bot.on('message', async (ctx, next) => {
+    if (ctx.session.adminState === 'broadcast_message' && ctx.from.id === ADMIN_ID) {
+      if (ctx.message.text && ctx.message.text.startsWith('/')) {
+        return next();
+      }
+
+      ctx.session.adminState = null;
+      ctx.reply("Yuborilmoqda... Bu biroz vaqt olishi mumkin.");
+
+      const users = db.prepare('SELECT id FROM users').all();
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < users.length; i++) {
+        const user = users[i];
+        try {
+          await ctx.telegram.copyMessage(user.id, ctx.message.chat.id, ctx.message.message_id);
+          successCount++;
+        } catch (error) {
+          failCount++;
+          if (error.response && error.response.error_code === 403) {
+             // Bot was blocked by the user, optional handle
+          }
+        }
+
+        // Rate limiting for Telegram API (max 30 messages per second)
+        if (i > 0 && i % 25 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      return ctx.reply(`✅ Xabar yuborish yakunlandi.\n\nMuvaqqiyatli: ${successCount} ta\nXatolik (Bloklaganlar): ${failCount} ta`, getAdminMenu());
+    }
+    return next();
   });
 
   bot.on('text', async (ctx) => {
