@@ -69,28 +69,6 @@ export const processReceiptText = async (text, ctx, sourceName) => {
           }
           return true;
         }
-      } else {
-        // Look for User ID in comments as a fallback
-        const userIdMatch = cleanedText.match(/ID[\s:-]*(\d+)/i) || cleanedText.match(/(?:Izoh|Comment)[\s:-]*(\d+)/i);
-        if (userIdMatch) {
-          const userId = parseInt(userIdMatch[1]);
-          const user = getUser(userId);
-
-          if (user) {
-            addBalance(userId, amount);
-            addTransaction(userId, 'topup', amount, `Avto-tasdiq (${sourceName}): Karta orqali (Izohdan)`);
-            try {
-              await ctx.telegram.sendMessage(userId, `✅ Karta to'lovingiz tasdiqlandi! Balansingizga ${amount} so'm qo'shildi.`);
-              const ADMIN_ID = process.env.ADMIN_ID;
-              if (ADMIN_ID) {
-                  await ctx.telegram.sendMessage(ADMIN_ID, `✅ ${sourceName} orqali avtomatik tasdiqlandi (Izohdan):\nID: ${userId}\nFoydalanuvchi: ${user.first_name}\nSumma: ${amount} so'm qo'shildi.`);
-              }
-            } catch (e) {
-              console.error("Could not send auto-approve message", e);
-            }
-            return true;
-          }
-        }
       }
     }
     return false;
