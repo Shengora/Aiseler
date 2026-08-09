@@ -62,7 +62,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     description TEXT,
-    price INTEGER
+    price INTEGER,
+    guide TEXT
   );
 
   CREATE TABLE IF NOT EXISTS product_keys (
@@ -75,11 +76,50 @@ db.exec(`
   );
 `);
 
+// Ensure 'guide' column exists in case of an older database
+try {
+  db.prepare('ALTER TABLE products ADD COLUMN guide TEXT').run();
+} catch (e) {
+  // Ignore error if column already exists
+}
+
 // Add a default product if not exists
 const checkProduct = db.prepare('SELECT COUNT(*) as count FROM products WHERE id = 1').get();
 if (checkProduct.count === 0) {
-  db.prepare('INSERT INTO products (id, name, description, price) VALUES (?, ?, ?, ?)').run(
-    1, 'GEMINI PRO 18 oy', 'Google AI Pro uchun tayyor shaxsiy aktivatsiya havolasi.', 36000
+  const defaultGuide = `📖 GEMINI PRO 18 oy qo'llanmasi
+
+🎬 Qo'llanma video: Sotib olish bo'yicha video qo'llanma
+
+Qanday sotib olinadi?
+1️⃣ Asosiy menyudagi GEMINI PRO 18 oy tugmasini bosing.
+2️⃣ Sotib olish tugmasini bosing. Har xaridda bitta havola beriladi.
+3️⃣ Balans, Payme, Click yoki Uzum orqali to'lovni yakunlang.
+4️⃣ To'lov tasdiqlangach, shaxsiy havolangiz shu chatga avtomatik yuboriladi.
+
+Havoladan qanday foydalaniladi?
+1️⃣ Havolani 24 soat ichida oching.
+2️⃣ Obuna qo'shmoqchi bo'lgan Google akkauntingizga kiring.
+3️⃣ Google ko'rsatmalarini oxirigacha bajaring va tasdiqlash oynasini yopmang.
+4️⃣ Aktivatsiya yakunlangach, Gemini ilovasi yoki gemini.google.com orqali tekshiring.
+
+Muhim qoidalar
+• Har bir havola faqat bir marta va bitta Google akkauntda ishlatiladi.
+• Havolani boshqa odamga yubormang va ommaga ulashmang.
+• Google qo'shimcha tasdiqlash so'rasa, aynan o'zingizning akkauntingizda tasdiqlang.
+• Obuna muddati Google va hamkor operator rejasi shartlariga bog'liq; odatda 18 oygacha faol bo'ladi.
+
+💬 Savol yoki muammo bo'lsa: @shenGorauz
+
+📌 Buyruqlar:
+/start — Asosiy menyu
+/help — To'liq qo'llanma
+/balance — Balans
+/topup — Balans to'ldirish
+/services — GEMINI PRO 18 oy
+/referral — Referal havolam
+/cancel — Bekor qilish`;
+  db.prepare('INSERT INTO products (id, name, description, price, guide) VALUES (?, ?, ?, ?, ?)').run(
+    1, 'GEMINI PRO 18 oy', 'Google AI Pro uchun tayyor shaxsiy aktivatsiya havolasi.', 36000, defaultGuide
   );
 }
 

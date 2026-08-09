@@ -346,10 +346,45 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     ctx.reply(text, Markup.inlineKeyboard([backButton]));
   });
 
+  const handleHelpCommand = (ctx, edit = false) => {
+    const products = db.prepare('SELECT id, name, guide FROM products').all();
+
+    if (products.length === 0) {
+      const text = "Hozircha tovarlar va qo'llanmalar mavjud emas.";
+      if (edit) {
+        ctx.editMessageText(text, Markup.inlineKeyboard([backButton])).catch(console.error);
+      } else {
+        ctx.reply(text, Markup.inlineKeyboard([backButton]));
+      }
+      return;
+    }
+
+    if (products.length === 1) {
+      const text = products[0].guide || "Qo'llanma mavjud emas.";
+      if (edit) {
+        ctx.editMessageText(text, Markup.inlineKeyboard([backButton])).catch(console.error);
+      } else {
+        ctx.reply(text, Markup.inlineKeyboard([backButton]));
+      }
+      return;
+    }
+
+    let buttons = [];
+    products.forEach(p => {
+      buttons.push([Markup.button.callback(`📖 ${p.name}`, `show_guide_${p.id}`)]);
+    });
+    buttons.push(backButton);
+
+    const text = "Qaysi tovar qo'llanmasini ko'rishni xohlaysiz?";
+    if (edit) {
+      ctx.editMessageText(text, Markup.inlineKeyboard(buttons)).catch(console.error);
+    } else {
+      ctx.reply(text, Markup.inlineKeyboard(buttons));
+    }
+  };
+
   bot.command('help', (ctx) => {
-    const price = getSetting('gemini_price') || '36000';
-    const text = `📖 GEMINI PRO 18 oy qo'llanmasi\n\n🎬 Qo'llanma video: Sotib olish bo'yicha video qo'llanma\n\nNarxi: ${price} so'm — 1 ta aktivatsiya havolasi\n\nQanday sotib olinadi?\n1️⃣ Asosiy menyudagi GEMINI PRO 18 oy tugmasini bosing.\n2️⃣ Sotib olish tugmasini bosing. Har xaridda bitta havola beriladi.\n3️⃣ Balans, Payme, Click yoki Uzum orqali to'lovni yakunlang.\n4️⃣ To'lov tasdiqlangach, shaxsiy havolangiz shu chatga avtomatik yuboriladi.\n\nHavoladan qanday foydalaniladi?\n1️⃣ Havolani 24 soat ichida oching.\n2️⃣ Obuna qo'shmoqchi bo'lgan Google akkauntingizga kiring.\n3️⃣ Google ko'rsatmalarini oxirigacha bajaring va tasdiqlash oynasini yopmang.\n4️⃣ Aktivatsiya yakunlangach, Gemini ilovasi yoki gemini.google.com orqali tekshiring.\n\nMuhim qoidalar\n• Har bir havola faqat bir marta va bitta Google akkauntda ishlatiladi.\n• Havolani boshqa odamga yubormang va ommaga ulashmang.\n• Google qo'shimcha tasdiqlash so'rasa, aynan o'zingizning akkauntingizda tasdiqlang.\n• Obuna muddati Google va hamkor operator rejasi shartlariga bog'liq; odatda 18 oygacha faol bo'ladi.\n\n💬 Savol yoki muammo bo'lsa: @shenGorauz \n\n📌 Buyruqlar:\n/start — Asosiy menyu\n/help — To'liq qo'llanma\n/balance — Balans\n/topup — Balans to'ldirish\n/services — GEMINI PRO 18 oy\n/referral — Referal havolam\n/cancel — Bekor qilish`;
-    ctx.reply(text, Markup.inlineKeyboard([backButton]));
+    handleHelpCommand(ctx, false);
   });
 
   // User Actions
@@ -453,10 +488,18 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     ctx.editMessageText(`📦 Tovar: ${p.name}\n💰 Narxi: ${p.price}\n📝 Ma'lumot: ${p.description}\n\nQaysi qismini tahrirlaysiz?`, Markup.inlineKeyboard([
       [Markup.button.callback('✏️ Nomini', `ep_name_${productId}`), Markup.button.callback('✏️ Narxini', `ep_price_${productId}`)],
-      [Markup.button.callback('📝 Ma\'lumotni', `ep_desc_${productId}`)],
+      [Markup.button.callback('📝 Ma\'lumotni', `ep_desc_${productId}`), Markup.button.callback('📖 Qo\'llanmani', `ep_guide_${productId}`)],
       [Markup.button.callback('🗑 O\'chirish', `ep_del_${productId}`)],
       [Markup.button.callback('◀️ Ortga', 'admin_products')]
     ]));
+  });
+
+  bot.action(/^ep_guide_(\d+)$/, (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+    ctx.session.adminState = 'edit_prod_guide';
+    ctx.session.pendingProductId = parseInt(ctx.match[1]);
+    ctx.editMessageText("Tovarning yangi qo'llanmasini kiriting:\n\nBekor qilish uchun /cancel");
   });
 
   bot.action(/^ep_name_(\d+)$/, (ctx) => {
@@ -600,8 +643,17 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
   bot.action('qollanma', (ctx) => {
     ctx.answerCbQuery();
-    const price = getSetting('gemini_price') || '36000';
-    const text = `📖 GEMINI PRO 18 oy qo'llanmasi\n\n🎬 Qo'llanma video: Sotib olish bo'yicha video qo'llanma\n\nNarxi: ${price} so'm — 1 ta aktivatsiya havolasi\n\nQanday sotib olinadi?\n1️⃣ Asosiy menyudagi GEMINI PRO 18 oy tugmasini bosing.\n2️⃣ Sotib olish tugmasini bosing. Har xaridda bitta havola beriladi.\n3️⃣ Balans, Payme, Click yoki Uzum orqali to'lovni yakunlang.\n4️⃣ To'lov tasdiqlangach, shaxsiy havolangiz shu chatga avtomatik yuboriladi.\n\nHavoladan qanday foydalaniladi?\n1️⃣ Havolani 24 soat ichida oching.\n2️⃣ Obuna qo'shmoqchi bo'lgan Google akkauntingizga kiring.\n3️⃣ Google ko'rsatmalarini oxirigacha bajaring va tasdiqlash oynasini yopmang.\n4️⃣ Aktivatsiya yakunlangach, Gemini ilovasi yoki gemini.google.com orqali tekshiring.\n\nMuhim qoidalar\n• Har bir havola faqat bir marta va bitta Google akkauntda ishlatiladi.\n• Havolani boshqa odamga yubormang va ommaga ulashmang.\n• Google qo'shimcha tasdiqlash so'rasa, aynan o'zingizning akkauntingizda tasdiqlang.\n• Obuna muddati Google va hamkor operator rejasi shartlariga bog'liq; odatda 18 oygacha faol bo'ladi.\n\n💬 Savol yoki muammo bo'lsa: @shenGorauz \n\n📌 Buyruqlar:\n/start — Asosiy menyu\n/help — To'liq qo'llanma\n/balance — Balans\n/topup — Balans to'ldirish\n/services — GEMINI PRO 18 oy\n/referral — Referal havolam\n/cancel — Bekor qilish`;
+    handleHelpCommand(ctx, true);
+  });
+
+  bot.action(/^show_guide_(\d+)$/, (ctx) => {
+    ctx.answerCbQuery();
+    const productId = parseInt(ctx.match[1]);
+    const product = db.prepare('SELECT guide FROM products WHERE id = ?').get(productId);
+    if (!product) {
+      return ctx.editMessageText('Tovar topilmadi.', Markup.inlineKeyboard([backButton])).catch(console.error);
+    }
+    const text = product.guide || "Qo'llanma mavjud emas.";
     ctx.editMessageText(text, Markup.inlineKeyboard([backButton])).catch(console.error);
   });
   
@@ -849,13 +901,18 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       } else if (state === 'add_product_price') {
         const val = parseInt(ctx.message.text.replace(/\D/g, ''));
         if (isNaN(val)) return ctx.reply('Faqat raqam kiriting.');
+        ctx.session.newProduct.price = val;
+        ctx.session.adminState = 'add_product_guide';
+        ctx.reply("Endi tovar uchun qo'llanma matnini kiriting:");
+      } else if (state === 'add_product_guide') {
+        const guideText = ctx.message.text;
         const p = ctx.session.newProduct || {};
-        if (!p.name || !p.description) {
+        if (!p.name || !p.description || !p.price) {
             ctx.session.adminState = null;
-            return ctx.reply('Xatolik: Tovar nomi yoki ma\'lumoti topilmadi. Iltimos qaytadan urinib ko\'ring.', getAdminMenu());
+            return ctx.reply('Xatolik: Tovar ma\'lumotlari toliq emas. Iltimos qaytadan urinib ko\'ring.', getAdminMenu());
         }
         try {
-            db.prepare('INSERT INTO products (name, description, price) VALUES (?, ?, ?)').run(p.name, p.description, val);
+            db.prepare('INSERT INTO products (name, description, price, guide) VALUES (?, ?, ?, ?)').run(p.name, p.description, p.price, guideText);
             ctx.session.adminState = null;
             ctx.session.newProduct = null;
             return ctx.reply('✅ Yangi tovar muvaffaqiyatli qo\'shildi!', getAdminMenu());
@@ -880,6 +937,11 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
         return ctx.reply('✅ Tovar narxi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+      } else if (state === 'edit_prod_guide') {
+        db.prepare('UPDATE products SET guide = ? WHERE id = ?').run(ctx.message.text, ctx.session.pendingProductId);
+        ctx.session.adminState = null;
+        ctx.session.pendingProductId = null;
+        return ctx.reply('✅ Tovar qo\'llanmasi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'add_key_text') {
         const lines = ctx.message.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length === 0) return ctx.reply("Kamida 1 ta kalit yozing.");
