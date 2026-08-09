@@ -963,7 +963,28 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
   
-  bot.launch().catch(err => console.error('Failed to launch bot:', err));
+
+// Auto-cancel pending payments older than 15 minutes
+setInterval(() => {
+  try {
+    const expiredPayments = db.prepare("SELECT rowid as id, user_id, amount FROM pending_payments WHERE created_at <= datetime('now', '-15 minutes')").all();
+
+    for (const payment of expiredPayments) {
+      db.prepare('DELETE FROM pending_payments WHERE rowid = ?').run(payment.id);
+
+      const formattedAmount = payment.amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      const text = `⚠️ Diqqat!\n\nSizning ${formattedAmount} so'm miqdoridagi balans to'ldirish buyurtmangiz uchun ajratilgan 15 daqiqa vaqt tugadi va u avtomatik tarzda bekor qilindi.`;
+
+      bot.telegram.sendMessage(payment.user_id, text).catch(err => {
+        // Ignored if user blocked the bot or isn't reachable
+      });
+    }
+  } catch (err) {
+    console.error('Error auto-cancelling payments:', err);
+  }
+}, 60 * 1000); // Check every minute
+
+bot.launch().catch(err => console.error('Failed to launch bot:', err));
   console.log('Telegram bot is running.');
   setTimeout(() => {
     startUserbot(bot).catch(console.error);
