@@ -1,2 +1,4 @@
 node_modules/
 .env
+bot.db
+bot.db-journal
