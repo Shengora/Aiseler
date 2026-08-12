@@ -37,35 +37,35 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const products = db.prepare('SELECT p.*, (SELECT COUNT(*) FROM product_keys WHERE product_id = p.id AND is_sold = 0) as stock FROM products p').all();
     
     let buttons = [
-      [{ text: '💰 Balansim', callback_data: 'balansim' }, { text: '➕ Balans to\'ldirish', callback_data: 'balans_toldirish', style: 'success' }]
+      [{ text: '💰 Balansim', callback_data: 'balansim', style: 'primary' }, { text: '➕ Balans to\'ldirish', callback_data: 'balans_toldirish', style: 'success' }]
     ];
     
     products.forEach(p => {
-      buttons.push([{ text: `✨ ${p.name} (${p.stock} ta)`, callback_data: `product_${p.id}` }]);
+      buttons.push([{ text: `✨ ${p.name} (${p.stock} ta)`, callback_data: `product_${p.id}`, style: 'primary' }]);
     });
     
     buttons.push(
-      [{ text: '📖 To\'liq qo\'llanma', callback_data: 'qollanma' }],
-      [{ text: '📋 Mening vazifalarim', callback_data: 'vazifalarim' }, { text: '📜 Tranzaksiyalar', callback_data: 'tranzaksiyalar' }],
-      [{ text: '👥 Referal havolam', callback_data: 'referal' }]
+      [{ text: '📖 To\'liq qo\'llanma', callback_data: 'qollanma', style: 'primary' }],
+      [{ text: '📋 Mening vazifalarim', callback_data: 'vazifalarim', style: 'primary' }, { text: '📜 Tranzaksiyalar', callback_data: 'tranzaksiyalar', style: 'primary' }],
+      [{ text: '👥 Referal havolam', callback_data: 'referal', style: 'primary' }]
     );
     
     return Markup.inlineKeyboard(buttons);
   };
 
-  const backButton = [{ text: '◀️ Asosiy menyu', callback_data: 'main_menu' }];
-  const adminBackButton = [{ text: '◀️ Admin menyu', callback_data: 'admin_menu' }];
+  const backButton = [{ text: '◀️ Asosiy menyu', callback_data: 'main_menu', style: 'danger' }];
+  const adminBackButton = [{ text: '◀️ Admin menyu', callback_data: 'admin_menu', style: 'danger' }];
 
   const getAdminMenu = () => {
     return Markup.inlineKeyboard([
-      [{ text: '📊 Statistika', callback_data: 'admin_stats' }, { text: '👥 Foydalanuvchi boshqaruvi', callback_data: 'admin_user_manage' }],
-      [{ text: '📦 Tovarlar boshqaruvi', callback_data: 'admin_products' }],
-      [{ text: '🔑 Kalit (Havola) qo\'shish', callback_data: 'admin_add_key' }],
-      [{ text: '⚙️ Referal bonusni o\'zgartirish', callback_data: 'admin_set_bonus' }],
-      [{ text: '💳 Karta o\'zgartirish', callback_data: 'admin_set_card_number' }, { text: '👤 Karta egasini o\'zgartirish', callback_data: 'admin_set_card_holder' }],
-      [{ text: '🤖 Userbot Sozlamalari', callback_data: 'admin_userbot_settings' }],
-      [{ text: '📢 Xabar yuborish (Broadcast)', callback_data: 'admin_broadcast' }],
-      [{ text: '◀️ Asosiy menyu', callback_data: 'main_menu' }]
+      [{ text: '📊 Statistika', callback_data: 'admin_stats', style: 'primary' }, { text: '👥 Foydalanuvchi boshqaruvi', callback_data: 'admin_user_manage', style: 'primary' }],
+      [{ text: '📦 Tovarlar boshqaruvi', callback_data: 'admin_products', style: 'primary' }],
+      [{ text: '🔑 Kalit (Havola) qo\'shish', callback_data: 'admin_add_key', style: 'primary' }],
+      [{ text: '⚙️ Referal bonusni o\'zgartirish', callback_data: 'admin_set_bonus', style: 'primary' }],
+      [{ text: '💳 Karta o\'zgartirish', callback_data: 'admin_set_card_number', style: 'primary' }, { text: '👤 Karta egasini o\'zgartirish', callback_data: 'admin_set_card_holder', style: 'primary' }],
+      [{ text: '🤖 Userbot Sozlamalari', callback_data: 'admin_userbot_settings', style: 'primary' }],
+      [{ text: '📢 Xabar yuborish (Broadcast)', callback_data: 'admin_broadcast', style: 'primary' }],
+      [{ text: '◀️ Asosiy menyu', callback_data: 'main_menu', style: 'danger' }]
     ]);
   };
 
@@ -170,7 +170,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const text = `📊 Statistika:\n\n👥 Foydalanuvchilar soni: ${usersCount} ta\n🛍 Sotilgan tovarlar: ${soldKeys} ta\n📦 Ombordagi tovarlar: ${availableKeys} ta\n💳 Jami to'ldirilgan balans: ${totalTopup.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} so'm`;
     
     ctx.editMessageText(text, Markup.inlineKeyboard([
-      [{ text: '📜 Sotuvlar tarixi', callback_data: 'admin_sales_history' }],
+      [{ text: '📜 Sotuvlar tarixi', callback_data: 'admin_sales_history', style: 'primary' }],
       adminBackButton
     ]));
   });
@@ -189,7 +189,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     if (sales.length === 0) {
       return ctx.editMessageText("Hozircha sotuvlar yo'q.", Markup.inlineKeyboard([
-        [{ text: '◀️ Ortga', callback_data: 'admin_stats' }]
+        [{ text: '◀️ Ortga', callback_data: 'admin_stats', style: 'danger' }]
       ]));
     }
     
@@ -199,7 +199,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     });
     
     ctx.editMessageText(text, Markup.inlineKeyboard([
-      [{ text: '◀️ Ortga', callback_data: 'admin_stats' }]
+      [{ text: '◀️ Ortga', callback_data: 'admin_stats', style: 'danger' }]
     ]));
   });
 
@@ -226,7 +226,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     ctx.editMessageText(text, Markup.inlineKeyboard([
       [{ text: '➕ Balans qo\'shish', callback_data: `admin_addbal_${userId}`, style: 'success' }, { text: '➖ Balans ayirish', callback_data: `admin_subbal_${userId}`, style: 'danger' }],
       [{ text: user.is_blocked ? '🟢 Blokdan chiqarish' : '🔴 Bloklash', callback_data: `admin_block_${userId}`, style: user.is_blocked ? 'success' : 'danger' }],
-      [{ text: '📜 Tarixini ko\'rish', callback_data: `admin_uhistory_${userId}` }],
+      [{ text: '📜 Tarixini ko\'rish', callback_data: `admin_uhistory_${userId}`, style: 'primary' }],
       adminBackButton
     ]));
   });
@@ -236,7 +236,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (ctx.from.id !== ADMIN_ID) return;
     ctx.session.adminState = 'add_user_balance';
     ctx.session.manageUserId = parseInt(ctx.match[1]);
-    ctx.editMessageText("Qo'shiladigan summani kiriting:", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${ctx.match[1]}` }]]));
+    ctx.editMessageText("Qo'shiladigan summani kiriting:", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${ctx.match[1]}`, style: 'danger' }]]));
   });
 
   bot.action(/^admin_subbal_(\d+)$/, (ctx) => {
@@ -244,7 +244,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (ctx.from.id !== ADMIN_ID) return;
     ctx.session.adminState = 'sub_user_balance';
     ctx.session.manageUserId = parseInt(ctx.match[1]);
-    ctx.editMessageText("Ayriladigan summani kiriting:", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${ctx.match[1]}` }]]));
+    ctx.editMessageText("Ayriladigan summani kiriting:", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${ctx.match[1]}`, style: 'danger' }]]));
   });
 
   bot.action(/^admin_block_(\d+)$/, (ctx) => {
@@ -255,7 +255,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (user) {
       const newStatus = user.is_blocked ? 0 : 1;
       db.prepare('UPDATE users SET is_blocked = ? WHERE id = ?').run(newStatus, userId);
-      ctx.editMessageText(`Foydalanuvchi muvaffaqiyatli ${newStatus ? 'bloklandi' : 'blokdan chiqarildi'}.`, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}` }]]));
+      ctx.editMessageText(`Foydalanuvchi muvaffaqiyatli ${newStatus ? 'bloklandi' : 'blokdan chiqarildi'}.`, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}`, style: 'danger' }]]));
     }
   });
 
@@ -268,7 +268,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const purchases = db.prepare('SELECT * FROM purchases WHERE user_id = ? ORDER BY date DESC LIMIT 15').all(userId);
 
     if (transactions.length === 0 && purchases.length === 0) {
-      return ctx.editMessageText("Bu foydalanuvchida tranzaksiyalar va xaridlar yo'q.", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}` }]]));
+      return ctx.editMessageText("Bu foydalanuvchida tranzaksiyalar va xaridlar yo'q.", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}`, style: 'danger' }]]));
     }
     
     let text = "📜 Foydalanuvchi tarixi:\n\n";
@@ -289,7 +289,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       });
     }
     
-    ctx.editMessageText(text, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}` }]]));
+    ctx.editMessageText(text, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}`, style: 'danger' }]]));
   });
 
   bot.command('addbal', (ctx) => {
@@ -371,7 +371,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
     let buttons = [];
     products.forEach(p => {
-      buttons.push([{ text: `📖 ${p.name}`, callback_data: `show_guide_${p.id}` }]);
+      buttons.push([{ text: `📖 ${p.name}`, callback_data: `show_guide_${p.id}`, style: 'primary' }]);
     });
     buttons.push(backButton);
 
@@ -433,7 +433,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       ctx.session.pendingTopupOriginal = null;
       ctx.session.pendingTopupAlternative = null;
          
-      ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '◀️ Asosiy menyu', callback_data: 'main_menu' }]] } }).catch(console.error);
+      ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '◀️ Asosiy menyu', callback_data: 'main_menu', style: 'danger' }]] } }).catch(console.error);
     }
   });
 
@@ -455,7 +455,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     } else {
       buttons.push([{ text: '❌ Hozircha qolmagan', callback_data: 'empty_stock', style: 'danger' }]);
     }
-    buttons.push([{ text: '📖 To\'liq qo\'llanma', callback_data: 'qollanma' }]);
+    buttons.push([{ text: '📖 To\'liq qo\'llanma', callback_data: 'qollanma', style: 'primary' }]);
     buttons.push(backButton);
     
     ctx.editMessageText(text, Markup.inlineKeyboard(buttons)).catch(console.error);
@@ -487,10 +487,10 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (!p) return ctx.editMessageText('Tovar topilmadi', Markup.inlineKeyboard([adminBackButton]));
     
     ctx.editMessageText(`📦 Tovar: ${p.name}\n💰 Narxi: ${p.price}\n📝 Ma'lumot: ${p.description}\n\nQaysi qismini tahrirlaysiz?`, Markup.inlineKeyboard([
-      [{ text: '✏️ Nomini', callback_data: `ep_name_${productId}` }, { text: '✏️ Narxini', callback_data: `ep_price_${productId}` }],
-      [{ text: '📝 Ma\'lumotni', callback_data: `ep_desc_${productId}` }, { text: '📖 Qo\'llanmani', callback_data: `ep_guide_${productId}` }],
+      [{ text: '✏️ Nomini', callback_data: `ep_name_${productId}`, style: 'primary' }, { text: '✏️ Narxini', callback_data: `ep_price_${productId}`, style: 'primary' }],
+      [{ text: '📝 Ma\'lumotni', callback_data: `ep_desc_${productId}`, style: 'primary' }, { text: '📖 Qo\'llanmani', callback_data: `ep_guide_${productId}`, style: 'primary' }],
       [{ text: '🗑 O\'chirish', callback_data: `ep_del_${productId}`, style: 'danger' }],
-      [{ text: '◀️ Ortga', callback_data: 'admin_products' }]
+      [{ text: '◀️ Ortga', callback_data: 'admin_products', style: 'danger' }]
     ]));
   });
 
@@ -533,7 +533,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     db.prepare('DELETE FROM products WHERE id = ?').run(productId);
     db.prepare('DELETE FROM product_keys WHERE product_id = ?').run(productId);
     ctx.editMessageText("✅ Tovar o'chirildi.", Markup.inlineKeyboard([
-      [{ text: '◀️ Ortga', callback_data: 'admin_products' }]
+      [{ text: '◀️ Ortga', callback_data: 'admin_products', style: 'danger' }]
     ]));
   });
 
@@ -712,7 +712,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     let buttons = [];
     products.forEach(p => {
       text += `🆔 ID: ${p.id} | ${p.name}\n💰 Narx: ${p.price} so'm | 📦 Omborda: ${p.stock} ta\n\n`;
-      buttons.push([{ text: `✏️ Tahrirlash: ${p.name}`, callback_data: `edit_prod_${p.id}` }]);
+      buttons.push([{ text: `✏️ Tahrirlash: ${p.name}`, callback_data: `edit_prod_${p.id}`, style: 'primary' }]);
     });
     buttons.push([{ text: '➕ Yangi tovar qo\'shish', callback_data: 'add_product', style: 'success' }]);
     buttons.push(adminBackButton);
@@ -728,7 +728,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     let buttons = [];
     products.forEach(p => {
-      buttons.push([{ text: `${p.name}`, callback_data: `add_key_${p.id}` }]);
+      buttons.push([{ text: `${p.name}`, callback_data: `add_key_${p.id}`, style: 'primary' }]);
     });
     buttons.push(adminBackButton);
     ctx.editMessageText("Qaysi tovarga kalit/havola qo'shmoqchisiz?", Markup.inlineKeyboard(buttons));
@@ -995,7 +995,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         ctx.reply(text, Markup.inlineKeyboard([
           [{ text: '➕ Balans qo\'shish', callback_data: `admin_addbal_${userId}`, style: 'success' }, { text: '➖ Balans ayirish', callback_data: `admin_subbal_${userId}`, style: 'danger' }],
           [{ text: user.is_blocked ? '🟢 Blokdan chiqarish' : '🔴 Bloklash', callback_data: `admin_block_${userId}`, style: user.is_blocked ? 'success' : 'danger' }],
-          [{ text: '📜 Tarixini ko\'rish', callback_data: `admin_uhistory_${userId}` }],
+          [{ text: '📜 Tarixini ko\'rish', callback_data: `admin_uhistory_${userId}`, style: 'primary' }],
           adminBackButton
         ]));
       } else if (state === 'add_user_balance') {
