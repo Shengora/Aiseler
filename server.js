@@ -37,35 +37,35 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const products = db.prepare('SELECT p.*, (SELECT COUNT(*) FROM product_keys WHERE product_id = p.id AND is_sold = 0) as stock FROM products p').all();
     
     let buttons = [
-      [Markup.button.callback('💰 Balansim', 'balansim'), Markup.button.callback('➕ Balans to\'ldirish', 'balans_toldirish')]
+      [{ text: '💰 Balansim', callback_data: 'balansim' }, { text: '➕ Balans to\'ldirish', callback_data: 'balans_toldirish', style: 'success' }]
     ];
     
     products.forEach(p => {
-      buttons.push([Markup.button.callback(`✨ ${p.name} (${p.stock} ta)`, `product_${p.id}`)]);
+      buttons.push([{ text: `✨ ${p.name} (${p.stock} ta)`, callback_data: `product_${p.id}` }]);
     });
     
     buttons.push(
-      [Markup.button.callback('📖 To\'liq qo\'llanma', 'qollanma')],
-      [Markup.button.callback('📋 Mening vazifalarim', 'vazifalarim'), Markup.button.callback('📜 Tranzaksiyalar', 'tranzaksiyalar')],
-      [Markup.button.callback('👥 Referal havolam', 'referal')]
+      [{ text: '📖 To\'liq qo\'llanma', callback_data: 'qollanma' }],
+      [{ text: '📋 Mening vazifalarim', callback_data: 'vazifalarim' }, { text: '📜 Tranzaksiyalar', callback_data: 'tranzaksiyalar' }],
+      [{ text: '👥 Referal havolam', callback_data: 'referal' }]
     );
     
     return Markup.inlineKeyboard(buttons);
   };
 
-  const backButton = [Markup.button.callback('◀️ Asosiy menyu', 'main_menu')];
-  const adminBackButton = [Markup.button.callback('◀️ Admin menyu', 'admin_menu')];
+  const backButton = [{ text: '◀️ Asosiy menyu', callback_data: 'main_menu' }];
+  const adminBackButton = [{ text: '◀️ Admin menyu', callback_data: 'admin_menu' }];
 
   const getAdminMenu = () => {
     return Markup.inlineKeyboard([
-      [Markup.button.callback('📊 Statistika', 'admin_stats'), Markup.button.callback('👥 Foydalanuvchi boshqaruvi', 'admin_user_manage')],
-      [Markup.button.callback('📦 Tovarlar boshqaruvi', 'admin_products')],
-      [Markup.button.callback('🔑 Kalit (Havola) qo\'shish', 'admin_add_key')],
-      [Markup.button.callback('⚙️ Referal bonusni o\'zgartirish', 'admin_set_bonus')],
-      [Markup.button.callback('💳 Karta o\'zgartirish', 'admin_set_card_number'), Markup.button.callback('👤 Karta egasini o\'zgartirish', 'admin_set_card_holder')],
-      [Markup.button.callback('🤖 Userbot Sozlamalari', 'admin_userbot_settings')],
-      [Markup.button.callback('📢 Xabar yuborish (Broadcast)', 'admin_broadcast')],
-      [Markup.button.callback('◀️ Asosiy menyu', 'main_menu')]
+      [{ text: '📊 Statistika', callback_data: 'admin_stats' }, { text: '👥 Foydalanuvchi boshqaruvi', callback_data: 'admin_user_manage' }],
+      [{ text: '📦 Tovarlar boshqaruvi', callback_data: 'admin_products' }],
+      [{ text: '🔑 Kalit (Havola) qo\'shish', callback_data: 'admin_add_key' }],
+      [{ text: '⚙️ Referal bonusni o\'zgartirish', callback_data: 'admin_set_bonus' }],
+      [{ text: '💳 Karta o\'zgartirish', callback_data: 'admin_set_card_number' }, { text: '👤 Karta egasini o\'zgartirish', callback_data: 'admin_set_card_holder' }],
+      [{ text: '🤖 Userbot Sozlamalari', callback_data: 'admin_userbot_settings' }],
+      [{ text: '📢 Xabar yuborish (Broadcast)', callback_data: 'admin_broadcast' }],
+      [{ text: '◀️ Asosiy menyu', callback_data: 'main_menu' }]
     ]);
   };
 
@@ -170,7 +170,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const text = `📊 Statistika:\n\n👥 Foydalanuvchilar soni: ${usersCount} ta\n🛍 Sotilgan tovarlar: ${soldKeys} ta\n📦 Ombordagi tovarlar: ${availableKeys} ta\n💳 Jami to'ldirilgan balans: ${totalTopup.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} so'm`;
     
     ctx.editMessageText(text, Markup.inlineKeyboard([
-      [Markup.button.callback('📜 Sotuvlar tarixi', 'admin_sales_history')],
+      [{ text: '📜 Sotuvlar tarixi', callback_data: 'admin_sales_history' }],
       adminBackButton
     ]));
   });
@@ -189,7 +189,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     if (sales.length === 0) {
       return ctx.editMessageText("Hozircha sotuvlar yo'q.", Markup.inlineKeyboard([
-        [Markup.button.callback('◀️ Ortga', 'admin_stats')]
+        [{ text: '◀️ Ortga', callback_data: 'admin_stats' }]
       ]));
     }
     
@@ -199,7 +199,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     });
     
     ctx.editMessageText(text, Markup.inlineKeyboard([
-      [Markup.button.callback('◀️ Ortga', 'admin_stats')]
+      [{ text: '◀️ Ortga', callback_data: 'admin_stats' }]
     ]));
   });
 
@@ -224,9 +224,9 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const text = `👤 Foydalanuvchi: ${user.first_name}\n🆔 ID: ${user.id}\n💰 Balans: ${user.balance} so'm\n💸 Jami xarajat: ${user.total_paid} so'm\n\nHolat: ${user.is_blocked ? '🔴 Bloklangan' : '🟢 Faol'}`;
     
     ctx.editMessageText(text, Markup.inlineKeyboard([
-      [Markup.button.callback('➕ Balans qo\'shish', `admin_addbal_${userId}`), Markup.button.callback('➖ Balans ayirish', `admin_subbal_${userId}`)],
-      [Markup.button.callback(user.is_blocked ? '🟢 Blokdan chiqarish' : '🔴 Bloklash', `admin_block_${userId}`)],
-      [Markup.button.callback('📜 Tarixini ko\'rish', `admin_uhistory_${userId}`)],
+      [{ text: '➕ Balans qo\'shish', callback_data: `admin_addbal_${userId}`, style: 'success' }, { text: '➖ Balans ayirish', callback_data: `admin_subbal_${userId}`, style: 'danger' }],
+      [{ text: user.is_blocked ? '🟢 Blokdan chiqarish' : '🔴 Bloklash', callback_data: `admin_block_${userId}`, style: user.is_blocked ? 'success' : 'danger' }],
+      [{ text: '📜 Tarixini ko\'rish', callback_data: `admin_uhistory_${userId}` }],
       adminBackButton
     ]));
   });
@@ -236,7 +236,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (ctx.from.id !== ADMIN_ID) return;
     ctx.session.adminState = 'add_user_balance';
     ctx.session.manageUserId = parseInt(ctx.match[1]);
-    ctx.editMessageText("Qo'shiladigan summani kiriting:", Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${ctx.match[1]}`)]]));
+    ctx.editMessageText("Qo'shiladigan summani kiriting:", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${ctx.match[1]}` }]]));
   });
 
   bot.action(/^admin_subbal_(\d+)$/, (ctx) => {
@@ -244,7 +244,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (ctx.from.id !== ADMIN_ID) return;
     ctx.session.adminState = 'sub_user_balance';
     ctx.session.manageUserId = parseInt(ctx.match[1]);
-    ctx.editMessageText("Ayriladigan summani kiriting:", Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${ctx.match[1]}`)]]));
+    ctx.editMessageText("Ayriladigan summani kiriting:", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${ctx.match[1]}` }]]));
   });
 
   bot.action(/^admin_block_(\d+)$/, (ctx) => {
@@ -255,7 +255,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (user) {
       const newStatus = user.is_blocked ? 0 : 1;
       db.prepare('UPDATE users SET is_blocked = ? WHERE id = ?').run(newStatus, userId);
-      ctx.editMessageText(`Foydalanuvchi muvaffaqiyatli ${newStatus ? 'bloklandi' : 'blokdan chiqarildi'}.`, Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${userId}`)]]));
+      ctx.editMessageText(`Foydalanuvchi muvaffaqiyatli ${newStatus ? 'bloklandi' : 'blokdan chiqarildi'}.`, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}` }]]));
     }
   });
 
@@ -268,7 +268,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const purchases = db.prepare('SELECT * FROM purchases WHERE user_id = ? ORDER BY date DESC LIMIT 15').all(userId);
 
     if (transactions.length === 0 && purchases.length === 0) {
-      return ctx.editMessageText("Bu foydalanuvchida tranzaksiyalar va xaridlar yo'q.", Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${userId}`)]]));
+      return ctx.editMessageText("Bu foydalanuvchida tranzaksiyalar va xaridlar yo'q.", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}` }]]));
     }
     
     let text = "📜 Foydalanuvchi tarixi:\n\n";
@@ -289,7 +289,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       });
     }
     
-    ctx.editMessageText(text, Markup.inlineKeyboard([[Markup.button.callback('◀️ Ortga', `manage_user_${userId}`)]]));
+    ctx.editMessageText(text, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: `manage_user_${userId}` }]]));
   });
 
   bot.command('addbal', (ctx) => {
@@ -318,7 +318,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (!user) return ctx.reply('Foydalanuvchi topilmadi. Iltimos /start ni bosing.');
     const text = `💰 Mening balansim\n\n💎 Balans: ${user.balance || 0} so'm\n🎫 Kreditlar: 0 ta\n📊 Jami to'langan: ${user.total_paid || 0} so'm\n\n💡 1 kredit = 19 900 so'm`;
     const balansMenu = Markup.inlineKeyboard([
-      [Markup.button.callback('➕ Balans to\'ldirish', 'balans_toldirish')],
+      [{ text: '➕ Balans to\'ldirish', callback_data: 'balans_toldirish', style: 'success' }],
       backButton
     ]);
     ctx.reply(text, balansMenu);
@@ -371,7 +371,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
     let buttons = [];
     products.forEach(p => {
-      buttons.push([Markup.button.callback(`📖 ${p.name}`, `show_guide_${p.id}`)]);
+      buttons.push([{ text: `📖 ${p.name}`, callback_data: `show_guide_${p.id}` }]);
     });
     buttons.push(backButton);
 
@@ -395,7 +395,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     const text = `💰 Mening balansim\n\n💎 Balans: ${user.balance || 0} so'm\n🎫 Kreditlar: 0 ta\n📊 Jami to'langan: ${user.total_paid || 0} so'm\n\n💡 1 kredit = 19 900 so'm`;
     const balansMenu = Markup.inlineKeyboard([
-      [Markup.button.callback('➕ Balans to\'ldirish', 'balans_toldirish')],
+      [{ text: '➕ Balans to\'ldirish', callback_data: 'balans_toldirish', style: 'success' }],
       backButton
     ]);
     ctx.editMessageText(text, balansMenu).catch(console.error);
@@ -433,7 +433,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       ctx.session.pendingTopupOriginal = null;
       ctx.session.pendingTopupAlternative = null;
          
-      ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[Markup.button.callback('◀️ Asosiy menyu', 'main_menu')]] } }).catch(console.error);
+      ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '◀️ Asosiy menyu', callback_data: 'main_menu' }]] } }).catch(console.error);
     }
   });
 
@@ -451,11 +451,11 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     let buttons = [];
     if (product.stock > 0) {
-      buttons.push([Markup.button.callback(`🛒 Sotib olish — ${product.price} so'm`, `buy_${product.id}`)]);
+      buttons.push([{ text: `🛒 Sotib olish — ${product.price} so'm`, callback_data: `buy_${product.id}`, style: 'success' }]);
     } else {
-      buttons.push([Markup.button.callback('❌ Hozircha qolmagan', 'empty_stock')]);
+      buttons.push([{ text: '❌ Hozircha qolmagan', callback_data: 'empty_stock', style: 'danger' }]);
     }
-    buttons.push([Markup.button.callback('📖 To\'liq qo\'llanma', 'qollanma')]);
+    buttons.push([{ text: '📖 To\'liq qo\'llanma', callback_data: 'qollanma' }]);
     buttons.push(backButton);
     
     ctx.editMessageText(text, Markup.inlineKeyboard(buttons)).catch(console.error);
@@ -487,10 +487,10 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     if (!p) return ctx.editMessageText('Tovar topilmadi', Markup.inlineKeyboard([adminBackButton]));
     
     ctx.editMessageText(`📦 Tovar: ${p.name}\n💰 Narxi: ${p.price}\n📝 Ma'lumot: ${p.description}\n\nQaysi qismini tahrirlaysiz?`, Markup.inlineKeyboard([
-      [Markup.button.callback('✏️ Nomini', `ep_name_${productId}`), Markup.button.callback('✏️ Narxini', `ep_price_${productId}`)],
-      [Markup.button.callback('📝 Ma\'lumotni', `ep_desc_${productId}`), Markup.button.callback('📖 Qo\'llanmani', `ep_guide_${productId}`)],
-      [Markup.button.callback('🗑 O\'chirish', `ep_del_${productId}`)],
-      [Markup.button.callback('◀️ Ortga', 'admin_products')]
+      [{ text: '✏️ Nomini', callback_data: `ep_name_${productId}` }, { text: '✏️ Narxini', callback_data: `ep_price_${productId}` }],
+      [{ text: '📝 Ma\'lumotni', callback_data: `ep_desc_${productId}` }, { text: '📖 Qo\'llanmani', callback_data: `ep_guide_${productId}` }],
+      [{ text: '🗑 O\'chirish', callback_data: `ep_del_${productId}`, style: 'danger' }],
+      [{ text: '◀️ Ortga', callback_data: 'admin_products' }]
     ]));
   });
 
@@ -533,7 +533,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     db.prepare('DELETE FROM products WHERE id = ?').run(productId);
     db.prepare('DELETE FROM product_keys WHERE product_id = ?').run(productId);
     ctx.editMessageText("✅ Tovar o'chirildi.", Markup.inlineKeyboard([
-      [Markup.button.callback('◀️ Ortga', 'admin_products')]
+      [{ text: '◀️ Ortga', callback_data: 'admin_products' }]
     ]));
   });
 
@@ -703,7 +703,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     if (products.length === 0) {
       return ctx.editMessageText("Sizda hozircha tovarlar yo'q.", Markup.inlineKeyboard([
-        [Markup.button.callback('➕ Yangi tovar qo\'shish', 'add_product')],
+        [{ text: '➕ Yangi tovar qo\'shish', callback_data: 'add_product', style: 'success' }],
         adminBackButton
       ]));
     }
@@ -712,9 +712,9 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     let buttons = [];
     products.forEach(p => {
       text += `🆔 ID: ${p.id} | ${p.name}\n💰 Narx: ${p.price} so'm | 📦 Omborda: ${p.stock} ta\n\n`;
-      buttons.push([Markup.button.callback(`✏️ Tahrirlash: ${p.name}`, `edit_prod_${p.id}`)]);
+      buttons.push([{ text: `✏️ Tahrirlash: ${p.name}`, callback_data: `edit_prod_${p.id}` }]);
     });
-    buttons.push([Markup.button.callback('➕ Yangi tovar qo\'shish', 'add_product')]);
+    buttons.push([{ text: '➕ Yangi tovar qo\'shish', callback_data: 'add_product', style: 'success' }]);
     buttons.push(adminBackButton);
 
     ctx.editMessageText(text, Markup.inlineKeyboard(buttons));
@@ -728,7 +728,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     let buttons = [];
     products.forEach(p => {
-      buttons.push([Markup.button.callback(`${p.name}`, `add_key_${p.id}`)]);
+      buttons.push([{ text: `${p.name}`, callback_data: `add_key_${p.id}` }]);
     });
     buttons.push(adminBackButton);
     ctx.editMessageText("Qaysi tovarga kalit/havola qo'shmoqchisiz?", Markup.inlineKeyboard(buttons));
@@ -764,7 +764,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const text = `🤖 Userbot Sozlamalari\n\nHolat: ${status}\n\nQuyidagi tugma orqali hisobni ulashingiz mumkin.`;
 
     ctx.editMessageText(text, Markup.inlineKeyboard([
-      [Markup.button.callback('🔗 Hisob ulash', 'admin_userbot_connect')],
+      [{ text: '🔗 Hisob ulash', callback_data: 'admin_userbot_connect', style: 'success' }],
       adminBackButton
     ]));
   });
@@ -874,7 +874,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         const text = `⚠️ ${formattedOriginal} so'm summasi hozirda band.\n\nBiz sizga ${formattedAlternative} so'm taklif qilamiz.\nFarq atigi ${diff} so'm.\n\nDavom etasizmi?`;
         
         return ctx.reply(text, Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Davom etish', 'confirm_amount'), Markup.button.callback('❌ Bekor qilish', 'main_menu')]
+          [{ text: '✅ Davom etish', callback_data: 'confirm_amount', style: 'success' }, { text: '❌ Bekor qilish', callback_data: 'main_menu', style: 'danger' }]
         ]));
       }
 
@@ -993,9 +993,9 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         const text = `👤 Foydalanuvchi: ${user.first_name}\n🆔 ID: ${user.id}\n💰 Balans: ${user.balance} so'm\n💸 Jami xarajat: ${user.total_paid} so'm\n\nHolat: ${user.is_blocked ? '🔴 Bloklangan' : '🟢 Faol'}`;
         
         ctx.reply(text, Markup.inlineKeyboard([
-          [Markup.button.callback('➕ Balans qo\'shish', `admin_addbal_${userId}`), Markup.button.callback('➖ Balans ayirish', `admin_subbal_${userId}`)],
-          [Markup.button.callback(user.is_blocked ? '🟢 Blokdan chiqarish' : '🔴 Bloklash', `admin_block_${userId}`)],
-          [Markup.button.callback('📜 Tarixini ko\'rish', `admin_uhistory_${userId}`)],
+          [{ text: '➕ Balans qo\'shish', callback_data: `admin_addbal_${userId}`, style: 'success' }, { text: '➖ Balans ayirish', callback_data: `admin_subbal_${userId}`, style: 'danger' }],
+          [{ text: user.is_blocked ? '🟢 Blokdan chiqarish' : '🔴 Bloklash', callback_data: `admin_block_${userId}`, style: user.is_blocked ? 'success' : 'danger' }],
+          [{ text: '📜 Tarixini ko\'rish', callback_data: `admin_uhistory_${userId}` }],
           adminBackButton
         ]));
       } else if (state === 'add_user_balance') {
