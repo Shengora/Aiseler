@@ -792,31 +792,45 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       }
 
       ctx.session.adminState = null;
-      ctx.reply("Yuborilmoqda... Bu biroz vaqt olishi mumkin.");
+      ctx.reply("Yuborilmoqda... Bu jarayon orqa fonda amalga oshiriladi va bot ishini davom ettiradi. Tugagach sizga xabar beraman.");
 
       const users = db.prepare('SELECT id FROM users').all();
-      let successCount = 0;
-      let failCount = 0;
 
-      for (let i = 0; i < users.length; i++) {
-        const user = users[i];
-        try {
-          await ctx.telegram.copyMessage(user.id, ctx.message.chat.id, ctx.message.message_id);
-          successCount++;
-        } catch (error) {
-          failCount++;
-          if (error.response && error.response.error_code === 403) {
-             // Bot was blocked by the user, optional handle
+      // Run the broadcast in the background immediately without blocking Telegraf update processing
+      (async () => {
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < users.length; i++) {
+          const user = users[i];
+          try {
+            await ctx.telegram.copyMessage(user.id, ctx.message.chat.id, ctx.message.message_id);
+            successCount++;
+          } catch (error) {
+            failCount++;
+            if (error.response && error.response.error_code === 403) {
+               // Bot was blocked by the user, optional handle
+            }
+          }
+
+          // Rate limiting for Telegram API (max 30 messages per second)
+          // Lowering batch size and yielding event loop for smooth performance
+          if (i > 0 && i % 20 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } else {
+            // yield to event loop so other events can be processed
+            await new Promise(resolve => setImmediate(resolve));
           }
         }
 
-        // Rate limiting for Telegram API (max 30 messages per second)
-        if (i > 0 && i % 25 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          await ctx.telegram.sendMessage(ctx.from.id, `✅ Xabar yuborish yakunlandi.\n\nMuvaqqiyatli: ${successCount} ta\nXatolik (Bloklaganlar): ${failCount} ta`, getAdminMenu());
+        } catch (e) {
+          console.error("Failed to notify admin about broadcast completion", e);
         }
-      }
+      })();
 
-      return ctx.reply(`✅ Xabar yuborish yakunlandi.\n\nMuvaqqiyatli: ${successCount} ta\nXatolik (Bloklaganlar): ${failCount} ta`, getAdminMenu());
+      return;
     }
     return next();
   });
