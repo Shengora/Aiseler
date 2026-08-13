@@ -5,6 +5,7 @@ import db from './db.js';
 import { processReceiptText } from './paymentProcessor.js';
 import { initiateUserbotLogin, handleUserbotAuthInputs } from './userbotAuth.js';
 import { startUserbot, isUserbotRunning } from './userbot.js';
+import { getBalance, getProducts, placeOrder, getOrderStatus } from './apiIntegration.js';
 
 // Global exception handlers to prevent the process from crashing
 process.on('uncaughtException', (err) => {
@@ -65,6 +66,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       [{ text: '💳 Karta o\'zgartirish', callback_data: 'admin_set_card_number', style: 'primary' }, { text: '👤 Karta egasini o\'zgartirish', callback_data: 'admin_set_card_holder', style: 'primary' }],
       [{ text: '🤖 Userbot Sozlamalari', callback_data: 'admin_userbot_settings', style: 'primary' }],
       [{ text: '📢 Xabar yuborish (Broadcast)', callback_data: 'admin_broadcast', style: 'primary' }],
+      [{ text: '🌐 API Boshqaruvi', callback_data: 'admin_api_manage', style: 'primary' }],
       [{ text: '◀️ Asosiy menyu', callback_data: 'main_menu', style: 'danger' }]
     ]);
   };
@@ -486,12 +488,21 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const p = db.prepare('SELECT * FROM products WHERE id = ?').get(productId);
     if (!p) return ctx.editMessageText('Tovar topilmadi', Markup.inlineKeyboard([adminBackButton]));
     
-    ctx.editMessageText(`📦 Tovar: ${p.name}\n💰 Narxi: ${p.price}\n📝 Ma'lumot: ${p.description}\n\nQaysi qismini tahrirlaysiz?`, Markup.inlineKeyboard([
+    ctx.editMessageText(`📦 Tovar: ${p.name}\n💰 Narxi: ${p.price}\n📝 Ma'lumot: ${p.description}\n🔗 API Ulash: ${p.api_service_id || 'Ulanmagan'}\n\nQaysi qismini tahrirlaysiz?`, Markup.inlineKeyboard([
       [{ text: '✏️ Nomini', callback_data: `ep_name_${productId}`, style: 'primary' }, { text: '✏️ Narxini', callback_data: `ep_price_${productId}`, style: 'primary' }],
       [{ text: '📝 Ma\'lumotni', callback_data: `ep_desc_${productId}`, style: 'primary' }, { text: '📖 Qo\'llanmani', callback_data: `ep_guide_${productId}`, style: 'primary' }],
+      [{ text: '🔗 API ulash (ID)', callback_data: `ep_api_${productId}`, style: 'primary' }],
       [{ text: '🗑 O\'chirish', callback_data: `ep_del_${productId}`, style: 'danger' }],
       [{ text: '◀️ Ortga', callback_data: 'admin_products', style: 'danger' }]
     ]));
+  });
+
+  bot.action(/^ep_api_(\d+)$/, (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+    ctx.session.adminState = 'edit_prod_api';
+    ctx.session.pendingProductId = parseInt(ctx.match[1]);
+    ctx.editMessageText("Tovarni ulash uchun API Service ID ni kiriting (o'chirish uchun 0 ni yuboring):\n\nBekor qilish uchun /cancel");
   });
 
   bot.action(/^ep_guide_(\d+)$/, (ctx) => {
@@ -573,6 +584,55 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 
         return keyRow;
       })();
+
+      const checkStock = db.prepare('SELECT COUNT(*) as stock FROM product_keys WHERE product_id = ? AND is_sold = 0').get(productId).stock;
+
+      if (checkStock === 0 && product.api_service_id) {
+        // Trigger auto replenishment in background
+        (async () => {
+          try {
+            const apiKey = getSetting('api_key');
+            if (!apiKey) throw new Error("API kaliti kiritilmagan");
+            const orderRes = await placeOrder(apiKey, product.api_service_id, 1);
+
+            let finalKey = null;
+            if (orderRes && (orderRes.order_id || orderRes.order)) {
+              let orderId = orderRes.order_id || orderRes.order;
+              // Poll for order status
+              let maxAttempts = 10;
+              while (maxAttempts > 0) {
+                await new Promise(r => setTimeout(r, 5000));
+                const statusRes = await getOrderStatus(apiKey, orderId);
+                const orderData = statusRes.order || statusRes;
+                if (orderData.status === 'Completed' || orderData.status === 'completed' || orderData.status === 'Success' || orderData.status === 'success') {
+                  finalKey = orderData.link || orderData.key || orderData.result || `Order Completed: ${orderId}`;
+                  break;
+                }
+                if (orderData.status === 'Canceled' || orderData.status === 'canceled' || orderData.status === 'Error' || orderData.status === 'error') {
+                  throw new Error("Buyurtma API tomonidan bekor qilindi/xato");
+                }
+                maxAttempts--;
+              }
+            } else {
+              // Maybe synchronous return?
+              finalKey = orderRes.link || orderRes.key || JSON.stringify(orderRes);
+            }
+
+            if (finalKey) {
+               db.prepare('INSERT INTO product_keys (product_id, key_text) VALUES (?, ?)').run(productId, finalKey);
+               if (ADMIN_ID) {
+                 await bot.telegram.sendMessage(ADMIN_ID, `🔄 <b>Avtomatik xarid muvaffaqiyatli!</b>\n\n🛍 Tovar: ${product.name}\n🔑 Yangi zaxira qo'shildi.`, { parse_mode: 'HTML' });
+               }
+            } else {
+               throw new Error("Havola topilmadi (timeout)");
+            }
+          } catch (e) {
+             if (ADMIN_ID) {
+                 await bot.telegram.sendMessage(ADMIN_ID, `⚠️ <b>Avtomatik xarid xatosi:</b>\n\n🛍 Tovar: ${product.name}\n❌ Xato: ${e.message}`, { parse_mode: 'HTML' });
+             }
+          }
+        })();
+      }
 
       // Log purchase to channel if configured
       const purchaseChannelId = process.env.PURCHASE_CHANNEL_ID;
@@ -775,6 +835,65 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     initiateUserbotLogin(ctx);
   });
 
+  bot.action('admin_api_manage', async (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+
+    const apiKey = getSetting('api_key');
+    let balanceText = "No'malum";
+
+    if (apiKey) {
+      try {
+        const balInfo = await getBalance(apiKey);
+        balanceText = JSON.stringify(balInfo);
+      } catch (err) {
+        balanceText = "Xato: " + err.message;
+      }
+    }
+
+    const text = `🌐 API Boshqaruvi\n\n🔑 API Kalit: ${apiKey ? 'O\'rnatilgan' : 'O\'rnatilmagan'}\n💰 API Balans: ${balanceText}`;
+
+    ctx.editMessageText(text, Markup.inlineKeyboard([
+      [{ text: '🔑 API Kalitni o\'zgartirish', callback_data: 'admin_set_api_key', style: 'primary' }],
+      [{ text: '🛍 API dagi tovarlarni ko\'rish', callback_data: 'admin_api_products', style: 'primary' }],
+      adminBackButton
+    ])).catch(console.error);
+  });
+
+  bot.action('admin_set_api_key', (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+    ctx.session.adminState = 'set_api_key';
+    ctx.editMessageText("Yangi API kalitni kiriting (bekor qilish uchun /cancel):", Markup.inlineKeyboard([
+      [{ text: '◀️ Ortga', callback_data: 'admin_api_manage', style: 'danger' }]
+    ])).catch(console.error);
+  });
+
+  bot.action('admin_api_products', async (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+    const apiKey = getSetting('api_key');
+    if (!apiKey) return ctx.editMessageText("API kalit o'rnatilmagan.", Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: 'admin_api_manage', style: 'danger' }]]));
+
+    ctx.editMessageText("Yuklanmoqda...").catch(console.error);
+    try {
+      const prods = await getProducts(apiKey);
+      // Assuming prods is an array or object containing array of products.
+      // We will slice to not exceed message limits
+      let pList = Array.isArray(prods) ? prods : (prods.services || prods.data || []);
+
+      let text = "🛍 API dagi tovarlar (Service ID lar):\n\n";
+      pList.slice(0, 30).forEach(p => {
+        text += `ID: ${p.service_id || p.id} | Nom: ${p.name || p.title}\n`;
+      });
+      if (pList.length === 0) text += "Hech narsa topilmadi.";
+
+      ctx.editMessageText(text, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: 'admin_api_manage', style: 'danger' }]]));
+    } catch (err) {
+      ctx.editMessageText("Xatolik: " + err.message, Markup.inlineKeyboard([[{ text: '◀️ Ortga', callback_data: 'admin_api_manage', style: 'danger' }]]));
+    }
+  });
+
   bot.action('admin_broadcast', (ctx) => {
     ctx.answerCbQuery();
     if (ctx.from.id !== ADMIN_ID) return;
@@ -956,6 +1075,13 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
         return ctx.reply('✅ Tovar qo\'llanmasi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+      } else if (state === 'edit_prod_api') {
+        let val = ctx.message.text.trim();
+        if (val === '0') val = null;
+        db.prepare('UPDATE products SET api_service_id = ? WHERE id = ?').run(val, ctx.session.pendingProductId);
+        ctx.session.adminState = null;
+        ctx.session.pendingProductId = null;
+        return ctx.reply('✅ Tovar API ID muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'add_key_text') {
         const lines = ctx.message.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length === 0) return ctx.reply("Kamida 1 ta kalit yozing.");
@@ -981,6 +1107,10 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         setSetting('card_holder', ctx.message.text);
         ctx.session.adminState = null;
         return ctx.reply('✅ Karta egasi ism-familiyasi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+      } else if (state === 'set_api_key') {
+        setSetting('api_key', ctx.message.text.trim());
+        ctx.session.adminState = null;
+        return ctx.reply('✅ API Kalit muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'manage_user_id') {
         const userId = parseInt(ctx.message.text);
         if (isNaN(userId)) return ctx.reply('Faqat raqam (User ID) kiriting.');

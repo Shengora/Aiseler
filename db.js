@@ -63,7 +63,8 @@ db.exec(`
     name TEXT,
     description TEXT,
     price INTEGER,
-    guide TEXT
+    guide TEXT,
+    api_service_id TEXT
   );
 
   CREATE TABLE IF NOT EXISTS product_keys (
@@ -76,12 +77,13 @@ db.exec(`
   );
 `);
 
-// Ensure 'guide' column exists in case of an older database
+// Ensure 'guide' and 'api_service_id' columns exist in case of an older database
 try {
   db.prepare('ALTER TABLE products ADD COLUMN guide TEXT').run();
-} catch (e) {
-  // Ignore error if column already exists
-}
+} catch (e) {}
+try {
+  db.prepare('ALTER TABLE products ADD COLUMN api_service_id TEXT').run();
+} catch (e) {}
 
 // Add a default product if not exists
 const checkProduct = db.prepare('SELECT COUNT(*) as count FROM products WHERE id = 1').get();
