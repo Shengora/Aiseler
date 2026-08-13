@@ -38,11 +38,11 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const products = db.prepare('SELECT p.*, (SELECT COUNT(*) FROM product_keys WHERE product_id = p.id AND is_sold = 0) as stock FROM products p').all();
     
     let buttons = [
-      [{ text: '💰 Balansim', callback_data: 'balansim', style: 'primary' }, { text: '➕ Balans to\'ldirish', callback_data: 'balans_toldirish', style: 'success' }]
+      [{ text: '💰 Balansim', callback_data: 'balansim', style: 'success' }, { text: '➕ Balans to\'ldirish', callback_data: 'balans_toldirish', style: 'success' }]
     ];
     
     products.forEach(p => {
-      buttons.push([{ text: `✨ ${p.name} (${p.stock} ta)`, callback_data: `product_${p.id}`, style: 'primary' }]);
+      buttons.push([{ text: `✨ ${p.name} (${p.stock} ta)`, callback_data: `product_${p.id}`, style: 'success' }]);
     });
     
     buttons.push(
