@@ -64,7 +64,8 @@ db.exec(`
     description TEXT,
     price INTEGER,
     guide TEXT,
-    api_service_id TEXT
+    api_service_id TEXT,
+    referral_bonus INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS product_keys (
@@ -77,12 +78,15 @@ db.exec(`
   );
 `);
 
-// Ensure 'guide' and 'api_service_id' columns exist in case of an older database
+// Ensure 'guide', 'api_service_id', and 'referral_bonus' columns exist in case of an older database
 try {
   db.prepare('ALTER TABLE products ADD COLUMN guide TEXT').run();
 } catch (e) {}
 try {
   db.prepare('ALTER TABLE products ADD COLUMN api_service_id TEXT').run();
+} catch (e) {}
+try {
+  db.prepare('ALTER TABLE products ADD COLUMN referral_bonus INTEGER').run();
 } catch (e) {}
 
 // Add a default product if not exists
