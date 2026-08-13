@@ -339,11 +339,10 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   bot.command('referral', (ctx) => {
     const user = getUser(ctx.from.id);
     if (!user) return;
-    const bonus = getSetting('referral_bonus') || '10000';
     const botInfo = ctx.botInfo;
     const refLink = `https://t.me/${botInfo.username}?start=${ctx.from.id}`;
     
-    const text = `👥 Referal dasturi\n\n🔗 Sizning havolangiz:\n${refLink}\n\n🎁 Mukofot: Taklif qilgan do'stingiz Gemini Pro havolasini muvaffaqiyatli xarid qilgan har safar sizga ${bonus} so'm balans bonusi beriladi.\n\nℹ️ Oddiy balans to'ldirish bonus bermaydi. Bonus faqat muvaffaqiyatli yakunlangan mahsulot xarididan keyin tushadi.\n\n📊 Statistika:\n👤 Taklif qilgansiz: ${user.referral_count || 0} ta\n✅ Xarid qilgan do'stlar: ${user.referral_purchases || 0} ta\n💰 Umumiy daromad: ${user.referral_earnings || 0} so'm`;
+    const text = `👥 Referal dasturi\n\n🔗 Sizning havolangiz:\n${refLink}\n\n🎁 Mukofot: Taklif qilgan do'stingiz tovar xarid qilganida, agar tovar uchun referal bonus belgilangan bo'lsa, sizga shu miqdorda bonus beriladi.\n\nℹ️ Oddiy balans to'ldirish bonus bermaydi. Bonus faqat muvaffaqiyatli yakunlangan mahsulot xarididan keyin tushadi.\n\n📊 Statistika:\n👤 Taklif qilgansiz: ${user.referral_count || 0} ta\n✅ Xarid qilgan do'stlar: ${user.referral_purchases || 0} ta\n💰 Umumiy daromad: ${user.referral_earnings || 0} so'm`;
     
     ctx.reply(text, Markup.inlineKeyboard([backButton]));
   });
@@ -488,13 +487,21 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     const p = db.prepare('SELECT * FROM products WHERE id = ?').get(productId);
     if (!p) return ctx.editMessageText('Tovar topilmadi', Markup.inlineKeyboard([adminBackButton]));
     
-    ctx.editMessageText(`📦 Tovar: ${p.name}\n💰 Narxi: ${p.price}\n📝 Ma'lumot: ${p.description}\n🔗 API Ulash: ${p.api_service_id || 'Ulanmagan'}\n\nQaysi qismini tahrirlaysiz?`, Markup.inlineKeyboard([
+    ctx.editMessageText(`📦 Tovar: ${p.name}\n💰 Narxi: ${p.price}\n📝 Ma'lumot: ${p.description}\n🔗 API Ulash: ${p.api_service_id || 'Ulanmagan'}\n🎁 Referal bonus: ${p.referral_bonus ? p.referral_bonus + ' so\'m' : 'Belgilanmagan (Berilmaydi)'}\n\nQaysi qismini tahrirlaysiz?`, Markup.inlineKeyboard([
       [{ text: '✏️ Nomini', callback_data: `ep_name_${productId}`, style: 'primary' }, { text: '✏️ Narxini', callback_data: `ep_price_${productId}`, style: 'primary' }],
       [{ text: '📝 Ma\'lumotni', callback_data: `ep_desc_${productId}`, style: 'primary' }, { text: '📖 Qo\'llanmani', callback_data: `ep_guide_${productId}`, style: 'primary' }],
-      [{ text: '🔗 API ulash (ID)', callback_data: `ep_api_${productId}`, style: 'primary' }],
+      [{ text: '🔗 API ulash (ID)', callback_data: `ep_api_${productId}`, style: 'primary' }, { text: '🎁 Referal bonus', callback_data: `ep_bonus_${productId}`, style: 'primary' }],
       [{ text: '🗑 O\'chirish', callback_data: `ep_del_${productId}`, style: 'danger' }],
       [{ text: '◀️ Ortga', callback_data: 'admin_products', style: 'danger' }]
     ]));
+  });
+
+  bot.action(/^ep_bonus_(\d+)$/, (ctx) => {
+    ctx.answerCbQuery();
+    if (ctx.from.id !== ADMIN_ID) return;
+    ctx.session.adminState = 'edit_prod_bonus';
+    ctx.session.pendingProductId = parseInt(ctx.match[1]);
+    ctx.editMessageText("Tovarning yangi referal bonusini kiriting (o'chirish/bermaslik uchun 0 ni yuboring):\n\nBekor qilish uchun /cancel");
   });
 
   bot.action(/^ep_api_(\d+)$/, (ctx) => {
@@ -648,13 +655,13 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
       }
 
       // Referral bonus
-      if (user.referrer_id) {
+      if (user.referrer_id && product.referral_bonus && product.referral_bonus > 0) {
         const referrer = getUser(user.referrer_id);
         if (referrer) {
-          const refBonus = parseInt(getSetting('referral_bonus') || '10000');
+          const refBonus = product.referral_bonus;
           addBalance(referrer.id, refBonus);
           db.prepare('UPDATE users SET referral_purchases = referral_purchases + 1, referral_earnings = referral_earnings + ? WHERE id = ?').run(refBonus, referrer.id);
-          addTransaction(referrer.id, 'bonus', refBonus, 'Referal xaridi uchun bonus');
+          addTransaction(referrer.id, 'bonus', refBonus, 'Referal xaridi uchun maxsus bonus');
           try {
             ctx.telegram.sendMessage(referrer.id, `🎉 Taklif qilgan do'stingiz xaridni amalga oshirdi! Sizga ${refBonus} so'm bonus berildi.`);
           } catch (e) {}
@@ -1038,14 +1045,21 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         ctx.session.adminState = 'add_product_guide';
         ctx.reply("Endi tovar uchun qo'llanma matnini kiriting:");
       } else if (state === 'add_product_guide') {
-        const guideText = ctx.message.text;
+        ctx.session.newProduct.guide = ctx.message.text;
+        ctx.session.adminState = 'add_product_bonus';
+        ctx.reply("Endi ushbu tovar uchun maxsus referal bonus summasini kiriting (ixtiyoriy, agar bermoqchi bo'lmasangiz 0 ni yuboring):");
+      } else if (state === 'add_product_bonus') {
+        let bonusVal = parseInt(ctx.message.text.replace(/\D/g, ''));
+        if (isNaN(bonusVal)) bonusVal = 0; // fallback if text was entered
+        ctx.session.newProduct.referral_bonus = bonusVal > 0 ? bonusVal : null;
+
         const p = ctx.session.newProduct || {};
         if (!p.name || !p.description || !p.price) {
             ctx.session.adminState = null;
             return ctx.reply('Xatolik: Tovar ma\'lumotlari toliq emas. Iltimos qaytadan urinib ko\'ring.', getAdminMenu());
         }
         try {
-            db.prepare('INSERT INTO products (name, description, price, guide) VALUES (?, ?, ?, ?)').run(p.name, p.description, p.price, guideText);
+            db.prepare('INSERT INTO products (name, description, price, guide, referral_bonus) VALUES (?, ?, ?, ?, ?)').run(p.name, p.description, p.price, p.guide, p.referral_bonus);
             ctx.session.adminState = null;
             ctx.session.newProduct = null;
             return ctx.reply('✅ Yangi tovar muvaffaqiyatli qo\'shildi!', getAdminMenu());
@@ -1082,6 +1096,13 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
         ctx.session.adminState = null;
         ctx.session.pendingProductId = null;
         return ctx.reply('✅ Tovar API ID muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
+      } else if (state === 'edit_prod_bonus') {
+        let val = parseInt(ctx.message.text.replace(/\D/g, ''));
+        if (isNaN(val) || val <= 0) val = null;
+        db.prepare('UPDATE products SET referral_bonus = ? WHERE id = ?').run(val, ctx.session.pendingProductId);
+        ctx.session.adminState = null;
+        ctx.session.pendingProductId = null;
+        return ctx.reply('✅ Tovar referal bonusi muvaffaqiyatli o\'zgartirildi!', getAdminMenu());
       } else if (state === 'add_key_text') {
         const lines = ctx.message.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length === 0) return ctx.reply("Kamida 1 ta kalit yozing.");
